@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -13,12 +14,74 @@
 #include <sys/stat.h>
 #include <sys/sendfile.h>
 
-#define PORT 8080
+#define DEFAULT_PORT 8080
+#define DEFAULT_WEB_ROOT "./www"
 #define BUFFER_SIZE 4096
 #define MAX_EVENTS 64
-#define WEB_ROOT "./www"
 #define DEFAULT_PAGE "/index.html"
 #define NOT_FOUND_PAGE "/404.html"
+
+// Configuration structure
+struct server_config {
+    int port;
+    char web_root[256];
+};
+
+// Global config
+struct server_config config;
+
+// In-place trim whitespace from start and end of a string
+void trim_whitespace(char *str) {
+    char *start = str;
+    while (isspace((unsigned char)*start)) {
+        start++;
+    }
+
+    char *end = str + strlen(str) - 1;
+    while (end > start && isspace((unsigned char)*end)) {
+        end--;
+    }
+    
+    // Write new null terminator
+    *(end + 1) = '\0';
+    
+    // Shift the string to the beginning
+    if (start != str) {
+        memmove(str, start, strlen(start) + 1);
+    }
+}
+
+void parse_config(const char *filename) {
+    // Set defaults first
+    config.port = DEFAULT_PORT;
+    strncpy(config.web_root, DEFAULT_WEB_ROOT, sizeof(config.web_root) - 1);
+
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("Config file '%s' not found, using defaults.\n", filename);
+        return;
+    }
+
+    char line[512];
+    while (fgets(line, sizeof(line), file)) {
+        if (line[0] == '#' || line[0] == '\n') continue;
+
+        char *key = strtok(line, "=");
+        char *value = strtok(NULL, "\n");
+
+        if (key && value) {
+            trim_whitespace(key);
+            trim_whitespace(value);
+            
+            if (strcmp(key, "port") == 0) {
+                config.port = atoi(value);
+            } else if (strcmp(key, "web_root") == 0) {
+                strncpy(config.web_root, value, sizeof(config.web_root) - 1);
+            }
+        }
+    }
+    fclose(file);
+}
 
 // Function to handle errors and exit
 void error_and_exit(const char *msg) {
@@ -86,9 +149,9 @@ void handle_http_request(int client_socket) {
 
     char file_path[BUFFER_SIZE];
     if (strcmp(req_path, "/") == 0) {
-        snprintf(file_path, sizeof(file_path), "%s%s", WEB_ROOT, DEFAULT_PAGE);
+        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root, DEFAULT_PAGE);
     } else {
-        snprintf(file_path, sizeof(file_path), "%s%s", WEB_ROOT, req_path);
+        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root, req_path);
     }
 
     struct stat file_stat;
@@ -97,7 +160,7 @@ void handle_http_request(int client_socket) {
 
     if (stat(file_path, &file_stat) < 0 || !S_ISREG(file_stat.st_mode)) {
         status_code = 404;
-        snprintf(file_path, sizeof(file_path), "%s%s", WEB_ROOT, NOT_FOUND_PAGE);
+        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root, NOT_FOUND_PAGE);
         stat(file_path, &file_stat); // Get stats for the 404 page
     }
 
@@ -125,12 +188,15 @@ void handle_http_request(int client_socket) {
     close(client_socket);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     int server_fd, client_fd;
     struct sockaddr_in server_addr;
     
     int epoll_fd;
     struct epoll_event event, events[MAX_EVENTS];
+
+    // Parse config file
+    parse_config("anx.conf");
 
     // Ignore SIGPIPE, which happens if a client disconnects unexpectedly.
     signal(SIGPIPE, SIG_IGN);
@@ -149,7 +215,7 @@ int main() {
 
     // 3. Bind socket to an address
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
+    server_addr.sin_port = htons(config.port);
     server_addr.sin_addr.s_addr = INADDR_ANY;
     if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         error_and_exit("bind");
@@ -178,7 +244,7 @@ int main() {
         error_and_exit("epoll_ctl");
     }
 
-    printf("ANX (C-StaticFile-Server) is listening on port %d\n", PORT);
+    printf("ANX (Configurable Server) is listening on port %d, serving from %s\n", config.port, config.web_root);
 
     // 8. The Main Event Loop
     while (1) {
