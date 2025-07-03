@@ -3,6 +3,6 @@
 
 # Executable file
 /anx
-
+ 
 # Configuration files that might contain secrets
 /config/*.local 
