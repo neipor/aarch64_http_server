@@ -10,10 +10,15 @@
 #include <fcntl.h>
 #include <sys/epoll.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/sendfile.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 4096
 #define MAX_EVENTS 64
+#define WEB_ROOT "./www"
+#define DEFAULT_PAGE "/index.html"
+#define NOT_FOUND_PAGE "/404.html"
 
 // Function to handle errors and exit
 void error_and_exit(const char *msg) {
@@ -35,6 +40,89 @@ static int make_socket_non_blocking(int fd) {
         return -1;
     }
     return 0;
+}
+
+// Simple function to get MIME type from file extension
+const char *get_mime_type(const char *path) {
+    const char *dot = strrchr(path, '.');
+    if (!dot || dot == path) return "application/octet-stream";
+    if (strcmp(dot, ".html") == 0) return "text/html";
+    if (strcmp(dot, ".css") == 0) return "text/css";
+    if (strcmp(dot, ".js") == 0) return "application/javascript";
+    if (strcmp(dot, ".jpg") == 0) return "image/jpeg";
+    if (strcmp(dot, ".jpeg") == 0) return "image/jpeg";
+    if (strcmp(dot, ".png") == 0) return "image/png";
+    return "application/octet-stream";
+}
+
+void handle_http_request(int client_socket) {
+    char buffer[BUFFER_SIZE] = {0};
+    ssize_t bytes_read = read(client_socket, buffer, BUFFER_SIZE - 1);
+
+    if (bytes_read <= 0) {
+        if (bytes_read == -1 && errno != EAGAIN) {
+            perror("read error");
+        }
+        close(client_socket);
+        return;
+    }
+
+    char *method = strtok(buffer, " \t\r\n");
+    char *req_path = strtok(NULL, " \t\r\n");
+
+    if (!method || !req_path) {
+        close(client_socket);
+        return;
+    }
+
+    printf("Received request on fd %d: Method=%s, Path=%s\n", client_socket, method, req_path);
+    
+    // Security: prevent directory traversal
+    if (strstr(req_path, "..")) {
+        // For simplicity, just close connection on malicious-looking paths
+        close(client_socket);
+        return;
+    }
+
+    char file_path[BUFFER_SIZE];
+    if (strcmp(req_path, "/") == 0) {
+        snprintf(file_path, sizeof(file_path), "%s%s", WEB_ROOT, DEFAULT_PAGE);
+    } else {
+        snprintf(file_path, sizeof(file_path), "%s%s", WEB_ROOT, req_path);
+    }
+
+    struct stat file_stat;
+    int file_fd = -1;
+    int status_code = 200;
+
+    if (stat(file_path, &file_stat) < 0 || !S_ISREG(file_stat.st_mode)) {
+        status_code = 404;
+        snprintf(file_path, sizeof(file_path), "%s%s", WEB_ROOT, NOT_FOUND_PAGE);
+        stat(file_path, &file_stat); // Get stats for the 404 page
+    }
+
+    file_fd = open(file_path, O_RDONLY);
+    if (file_fd < 0) {
+        // If even the 404 page can't be opened, something is very wrong.
+        close(client_socket);
+        return;
+    }
+
+    const char *mime_type = get_mime_type(file_path);
+    char header[BUFFER_SIZE];
+    snprintf(header, sizeof(header),
+             "HTTP/1.1 %d %s\r\n"
+             "Content-Type: %s\r\n"
+             "Content-Length: %ld\r\n"
+             "Server: ANX-Static/0.5.0\r\n"
+             "Connection: close\r\n\r\n",
+             status_code, (status_code == 200) ? "OK" : "Not Found",
+             mime_type, file_stat.st_size);
+
+    write(client_socket, header, strlen(header));
+    sendfile(client_socket, file_fd, NULL, file_stat.st_size);
+    close(file_fd);
+    close(client_socket);
 }
 
 int main() {
@@ -90,7 +178,7 @@ int main() {
         error_and_exit("epoll_ctl");
     }
 
-    printf("ANX (C-Epoll-Version) is listening on port %d\n", PORT);
+    printf("ANX (C-StaticFile-Server) is listening on port %d\n", PORT);
 
     // 8. The Main Event Loop
     while (1) {
@@ -139,52 +227,7 @@ int main() {
             else
             {
                 // --- Event on a client socket: data is ready to be read ---
-                int client_socket = events[i].data.fd;
-                char buffer[BUFFER_SIZE] = {0};
-                
-                ssize_t bytes_read = read(client_socket, buffer, BUFFER_SIZE - 1);
-                
-                if (bytes_read == -1) {
-                    // If EAGAIN, that means we have read all data. So do nothing.
-                    // Otherwise, a real error occurred.
-                    if (errno != EAGAIN) {
-                        perror("read error");
-                        close(client_socket);
-                    }
-                } else if (bytes_read == 0) {
-                    // End of file. The remote has closed the connection.
-                    close(client_socket);
-                } else {
-                    // --- Data was read successfully, process it ---
-                    char *method = strtok(buffer, " \t\r\n");
-                    char *path = strtok(NULL, " \t\r\n");
-
-                    if (method && path) {
-                         printf("Received request on fd %d: Method=%s, Path=%s\n", client_socket, method, path);
-
-                        // Build the HTTP response
-                        char response[BUFFER_SIZE];
-                        snprintf(response, sizeof(response),
-                                 "HTTP/1.1 200 OK\r\n"
-                                 "Content-Type: text/plain\r\n"
-                                 "Server: ANX-Epoll/0.4.0\r\n"
-                                 "Connection: close\r\n" // Important: tell client we will close
-                                 "Content-Length: %zu\r\n"
-                                 "\r\n"
-                                 "You requested path: %s",
-                                 strlen(path) + strlen("You requested path: "), path);
-                        
-                        // Note: A non-blocking write() might not write all data at once.
-                        // For this example, we assume it does. A robust implementation
-                        // would handle partial writes.
-                        if (write(client_socket, response, strlen(response)) < 0) {
-                            perror("write");
-                        }
-                    }
-                    // Regardless of success, we close the socket after one request.
-                    // A more advanced server would handle keep-alive.
-                    close(client_socket);
-                }
+                handle_http_request(events[i].data.fd);
             }
         }
     }
