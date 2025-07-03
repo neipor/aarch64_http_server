@@ -1,27 +1,30 @@
-# Compiler and Linker
-AS = as
-LD = ld
+# Compiler
+CC = gcc
+
+# Compiler flags
+# -g: Add debug info
+# -Wall: Turn on all warnings
+# -O2: Optimization level 2
+CFLAGS = -g -Wall -O2
 
 # Source files and Object files
-SRCS = $(wildcard src/*.s)
-OBJS = $(patsubst src/%.s, build/%.o, $(SRCS))
+# Find all .c files in the src directory
+SRCS = $(wildcard src/*.c)
+OBJS = $(patsubst src/%.c, build/%.o, $(SRCS))
 
 # Target executable
 TARGET = anx
-
-# Flags
-ASFLAGS = -g # -g adds debug information
-LDFLAGS = 
 
 .PHONY: all clean
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(LD) $(LDFLAGS) -o $(TARGET) $(OBJS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
 
-build/%.o: src/%.s
-	$(AS) $(ASFLAGS) -o $@ $<
+build/%.o: src/%.c
+	@mkdir -p build
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
 	rm -f $(TARGET) build/*.o 
