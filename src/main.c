@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
+#include <sys/wait.h>
 
 #define DEFAULT_PORT 8080
 #define DEFAULT_WEB_ROOT "./www"
@@ -25,10 +26,22 @@
 struct server_config {
     int port;
     char web_root[256];
+    int num_workers;
 };
 
 // Global config
 struct server_config config;
+
+pid_t worker_pids[128];
+int num_workers_spawned = 0;
+
+void signal_handler(int signum) {
+    printf("\nMaster process %d received signal %d. Shutting down workers.\n", getpid(), signum);
+    for (int i = 0; i < num_workers_spawned; i++) {
+        kill(worker_pids[i], SIGKILL);
+    }
+    // Let the main loop's wait() handle reaping
+}
 
 // In-place trim whitespace from start and end of a string
 void trim_whitespace(char *str) {
@@ -55,6 +68,7 @@ void parse_config(const char *filename) {
     // Set defaults first
     config.port = DEFAULT_PORT;
     strncpy(config.web_root, DEFAULT_WEB_ROOT, sizeof(config.web_root) - 1);
+    config.num_workers = 2; // Default to 2 workers
 
     FILE *file = fopen(filename, "r");
     if (!file) {
@@ -77,6 +91,8 @@ void parse_config(const char *filename) {
                 config.port = atoi(value);
             } else if (strcmp(key, "web_root") == 0) {
                 strncpy(config.web_root, value, sizeof(config.web_root) - 1);
+            } else if (strcmp(key, "num_workers") == 0) {
+                config.num_workers = atoi(value);
             }
         }
     }
@@ -138,7 +154,7 @@ void handle_http_request(int client_socket) {
         return;
     }
 
-    printf("Received request on fd %d: Method=%s, Path=%s\n", client_socket, method, req_path);
+    printf("[Worker %d] Received request on fd %d: Method=%s, Path=%s\n", getpid(), client_socket, method, req_path);
     
     // Security: prevent directory traversal
     if (strstr(req_path, "..")) {
@@ -188,32 +204,69 @@ void handle_http_request(int client_socket) {
     close(client_socket);
 }
 
-int main(int argc, char *argv[]) {
-    int server_fd, client_fd;
-    struct sockaddr_in server_addr;
-    
+void worker_loop(int server_fd) {
     int epoll_fd;
     struct epoll_event event, events[MAX_EVENTS];
 
-    // Parse config file
-    parse_config("anx.conf");
+    epoll_fd = epoll_create1(0);
+    if (epoll_fd == -1) error_and_exit("epoll_create1 (worker)");
 
-    // Ignore SIGPIPE, which happens if a client disconnects unexpectedly.
-    signal(SIGPIPE, SIG_IGN);
-
-    // 1. Create socket
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0) {
-        error_and_exit("socket");
+    event.data.fd = server_fd;
+    event.events = EPOLLIN | EPOLLET;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &event) == -1) {
+        error_and_exit("epoll_ctl (worker)");
     }
 
-    // 2. Set SO_REUSEADDR to allow fast restarts
+    printf("Worker process %d started.\n", getpid());
+
+    while (1) {
+        int n = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+        for (int i = 0; i < n; i++) {
+            if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP)) {
+                fprintf(stderr, "[Worker %d] epoll error on fd %d\n", getpid(), events[i].data.fd);
+                close(events[i].data.fd);
+                continue;
+            }
+
+            if (server_fd == events[i].data.fd) {
+                while (1) {
+                    struct sockaddr_in client_addr;
+                    socklen_t client_len = sizeof(client_addr);
+                    int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
+                    if (client_fd == -1) {
+                        if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
+                           perror("accept");
+                        }
+                        break;
+                    }
+                    // In this simplified model, we handle the request and close immediately.
+                    // A more advanced server might add the new client_fd to epoll to handle
+                    // keep-alive, but for now this is fine.
+                    handle_http_request(client_fd);
+                }
+            }
+        }
+    }
+}
+
+int main(int argc, char *argv[]) {
+    int server_fd;
+    struct sockaddr_in server_addr;
+
+    parse_config("anx.conf");
+
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) error_and_exit("socket");
+
     int opt = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         error_and_exit("setsockopt");
     }
 
-    // 3. Bind socket to an address
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(config.port);
     server_addr.sin_addr.s_addr = INADDR_ANY;
@@ -221,84 +274,42 @@ int main(int argc, char *argv[]) {
         error_and_exit("bind");
     }
 
-    // 4. Make the server socket non-blocking
     if (make_socket_non_blocking(server_fd) == -1) {
         error_and_exit("make_socket_non_blocking");
     }
 
-    // 5. Listen for connections
     if (listen(server_fd, SOMAXCONN) < 0) {
         error_and_exit("listen");
     }
 
-    // 6. Create epoll instance
-    epoll_fd = epoll_create1(0);
-    if (epoll_fd == -1) {
-        error_and_exit("epoll_create1");
-    }
+    printf("ANX Master %d started. Spawning %d workers.\n", getpid(), config.num_workers);
+    printf("Server listening on port %d, serving from %s\n", config.port, config.web_root);
 
-    // 7. Add server socket to epoll
-    event.data.fd = server_fd;
-    event.events = EPOLLIN | EPOLLET; // Edge-Triggered for new connections
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &event) == -1) {
-        error_and_exit("epoll_ctl");
-    }
-
-    printf("ANX (Configurable Server) is listening on port %d, serving from %s\n", config.port, config.web_root);
-
-    // 8. The Main Event Loop
-    while (1) {
-        int n = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
-        for (int i = 0; i < n; i++) {
-            if ((events[i].events & EPOLLERR) ||
-                (events[i].events & EPOLLHUP) ||
-                (!(events[i].events & EPOLLIN)))
-            {
-                // An error has occured on this fd, or the socket is not ready for reading
-                fprintf(stderr, "epoll error on fd %d\n", events[i].data.fd);
-                close(events[i].data.fd);
-                continue;
-            } 
-            else if (server_fd == events[i].data.fd) 
-            {
-                // --- Event on the listening socket: new connection(s) ---
-                while (1) {
-                    struct sockaddr_in client_addr;
-                    socklen_t client_len = sizeof(client_addr);
-                    client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
-                    if (client_fd == -1) {
-                        if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-                            // We have processed all incoming connections.
-                            break;
-                        } else {
-                            perror("accept");
-                            break;
-                        }
-                    }
-                    
-                    if (make_socket_non_blocking(client_fd) == -1) {
-                        close(client_fd);
-                        continue;
-                    }
-                    
-                    // Add the new client socket to the epoll interest list
-                    event.data.fd = client_fd;
-                    event.events = EPOLLIN | EPOLLET; // Edge-triggered for client data
-                    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &event) == -1) {
-                        perror("epoll_ctl add client");
-                        close(client_fd);
-                    }
-                }
-            }
-            else
-            {
-                // --- Event on a client socket: data is ready to be read ---
-                handle_http_request(events[i].data.fd);
-            }
+    for (int i = 0; i < config.num_workers; i++) {
+        if (i >= 128) {
+            fprintf(stderr, "Max number of workers (128) reached.\n");
+            break;
+        }
+        pid_t pid = fork();
+        if (pid == 0) { // Child process
+            // Child should not handle master's signals
+            signal(SIGINT, SIG_DFL);
+            signal(SIGTERM, SIG_DFL);
+            worker_loop(server_fd);
+            exit(0);
+        } else if (pid > 0) { // Parent process
+            worker_pids[i] = pid;
+            num_workers_spawned++;
+        } else {
+            perror("fork");
         }
     }
 
-    // This part is unreachable in the while(1) loop
+    // Master process waits for children to exit.
+    int status;
+    while (wait(&status) > 0);
+
     close(server_fd);
+    printf("ANX Master shutting down.\n");
     return 0;
 } 
