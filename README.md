@@ -1,22 +1,54 @@
-# ANX: ASM Nginx
+# ANX - A(sm) Nginx-like Experimental Server
 
-**ANX** 是一个使用纯ARMv8-A (AArch64) 汇编语言编写的、旨在实现超高性能和极致安全的HTTP服务器。项目运行在树莓派5上，并受到Nginx设计的启发。
+ANX is a lightweight, high-performance static file server designed to be both a learning project and a functional server. It started as an experiment in C and is planned to be gradually optimized with ARM assembly for maximum performance on Raspberry Pi and other ARM-based devices.
 
-## 项目目标
+## Current State
 
-- **极致性能**: 通过汇编语言和Linux `epoll` 实现顶级的并发处理能力。
-- **高安全性**: 精心控制内存和系统调用，最大限度地减少攻击面。
-- **模块化**: 仿照Nginx，设计一个清晰、可扩展的架构。
-- **学习与探索**: 深入理解底层系统、网络协议和处理器架构。
+The server is currently implemented in C and supports:
+- Multi-worker architecture using `fork()`
+- Event-driven I/O with `epoll`
+- HTTP and HTTPS (with OpenSSL)
+- Static file serving
+- Configurable via `server.conf`
+- Detailed logging
 
-## 架构
+## Roadmap
 
-本服务器采用事件驱动、非阻塞I/O模型。
+The future development of ANX will follow these key phases:
 
-- **语言**: GNU AS (AArch64)
-- **核心API**: Linux `epoll`
-- **并发模型**: 单进程事件循环
+1.  **Phase 1: C Implementation (Current)**
+    - Build a robust and functional HTTP/S server in C.
+    - Implement core features like static file serving, multi-worker processing, and basic configuration.
+    - Ensure stability and correctness.
 
-## 状态
+2.  **Phase 2: Gradual Assembly Optimization**
+    - Identify performance-critical sections of the C code (e.g., request parsing, I/O handling).
+    - Begin rewriting these specific functions in ARM assembly language.
+    - Integrate assembly functions with the existing C codebase.
+    - The goal is to profile and optimize, not to rewrite everything at once.
 
-当前处于项目 **规划与框架搭建** 阶段。 
+3.  **Phase 3: Advanced Features**
+    - Implement more advanced Nginx-like features, such as reverse proxying, load balancing, and more complex routing.
+    - The configuration for these features will aim for compatibility with Nginx's syntax where possible.
+
+## Building and Running
+
+1.  **Install dependencies** (like OpenSSL):
+    ```bash
+    sudo apt-get update && sudo apt-get install libssl-dev
+    ```
+2.  **Generate self-signed certificates** (for HTTPS):
+    ```bash
+    mkdir certs
+    openssl req -x509 -newkey rsa:2048 -nodes -keyout certs/server.key -out certs/server.crt -subj "/C=CN/ST=BeiJing/L=BeiJing/O=asm_http_server/OU=dev/CN=localhost"
+    ```
+3.  **Compile**:
+    ```bash
+    make
+    ```
+4.  **Run**:
+    ```bash
+    ./anx server.conf
+    ```
+
+The server will then be listening on the ports defined in `server.conf`. 
