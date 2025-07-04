@@ -1,22 +1,22 @@
+#include <arpa/inet.h>
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <ctype.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <signal.h>
-#include <fcntl.h>
 #include <sys/epoll.h>
-#include <errno.h>
-#include <sys/stat.h>
 #include <sys/sendfile.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/wait.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
 #include <time.h>
+#include <unistd.h>
 
 #define DEFAULT_PORT 8080
 #define DEFAULT_HTTPS_PORT 8443
@@ -27,11 +27,7 @@
 #define NOT_FOUND_PAGE "/404.html"
 
 // Log levels
-typedef enum {
-    LOG_LEVEL_INFO,
-    LOG_LEVEL_ERROR,
-    LOG_LEVEL_DEBUG
-} log_level_t;
+typedef enum { LOG_LEVEL_INFO, LOG_LEVEL_ERROR, LOG_LEVEL_DEBUG } log_level_t;
 
 // Configuration structure
 struct server_config {
@@ -54,14 +50,14 @@ void log_message(log_level_t level, const char *message) {
     time_t now = time(NULL);
     char buf[sizeof("2024-01-01 12:00:00")];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", gmtime(&now));
-    
+
     const char *level_str = "INFO";
     if (level == LOG_LEVEL_ERROR) {
         level_str = "ERROR";
     } else if (level == LOG_LEVEL_DEBUG) {
         level_str = "DEBUG";
     }
-    
+
     // Log to stdout for now. Could be redirected to a file.
     printf("[%s] [%s] [%d] %s\n", buf, level_str, getpid(), message);
     fflush(stdout);
@@ -69,7 +65,8 @@ void log_message(log_level_t level, const char *message) {
 
 void signal_handler(int signum) {
     char msg[128];
-    snprintf(msg, sizeof(msg), "Received signal %d. Shutting down workers.", signum);
+    snprintf(msg, sizeof(msg), "Received signal %d. Shutting down workers.",
+             signum);
     log_message(LOG_LEVEL_INFO, msg);
     for (int i = 0; i < num_workers_spawned; i++) {
         kill(worker_pids[i], SIGKILL);
@@ -88,10 +85,10 @@ void trim_whitespace(char *str) {
     while (end > start && isspace((unsigned char)*end)) {
         end--;
     }
-    
+
     // Write new null terminator
     *(end + 1) = '\0';
-    
+
     // Shift the string to the beginning
     if (start != str) {
         memmove(str, start, strlen(start) + 1);
@@ -103,14 +100,15 @@ void parse_config(const char *filename) {
     config.port = DEFAULT_PORT;
     config.https_port = DEFAULT_HTTPS_PORT;
     strncpy(config.web_root, DEFAULT_WEB_ROOT, sizeof(config.web_root) - 1);
-    config.num_workers = 2; // Default to 2 workers
+    config.num_workers = 2;  // Default to 2 workers
     strncpy(config.cert_file, "certs/server.crt", sizeof(config.cert_file) - 1);
     strncpy(config.key_file, "certs/server.key", sizeof(config.key_file) - 1);
 
     FILE *file = fopen(filename, "r");
     if (!file) {
         char msg[256];
-        snprintf(msg, sizeof(msg), "Config file '%s' not found, using defaults.", filename);
+        snprintf(msg, sizeof(msg),
+                 "Config file '%s' not found, using defaults.", filename);
         log_message(LOG_LEVEL_INFO, msg);
         return;
     }
@@ -125,7 +123,7 @@ void parse_config(const char *filename) {
         if (key && value) {
             trim_whitespace(key);
             trim_whitespace(value);
-            
+
             if (strcmp(key, "port") == 0) {
                 config.port = atoi(value);
             } else if (strcmp(key, "https_port") == 0) {
@@ -179,7 +177,7 @@ const char *get_mime_type(const char *path) {
     return "application/octet-stream";
 }
 
-void handle_https_request(SSL *ssl, const char* client_ip) {
+void handle_https_request(SSL *ssl, const char *client_ip) {
     char buffer[BUFFER_SIZE] = {0};
     int client_socket = SSL_get_fd(ssl);
 
@@ -197,7 +195,8 @@ void handle_https_request(SSL *ssl, const char* client_ip) {
 
     if (bytes_read <= 0) {
         int ssl_error = SSL_get_error(ssl, bytes_read);
-        if (ssl_error != SSL_ERROR_WANT_READ && ssl_error != SSL_ERROR_WANT_WRITE) {
+        if (ssl_error != SSL_ERROR_WANT_READ &&
+            ssl_error != SSL_ERROR_WANT_WRITE) {
             log_message(LOG_LEVEL_ERROR, "SSL_read error");
             ERR_print_errors_fp(stderr);
         }
@@ -219,13 +218,15 @@ void handle_https_request(SSL *ssl, const char* client_ip) {
     }
 
     char log_msg[BUFFER_SIZE];
-    snprintf(log_msg, sizeof(log_msg), "HTTPS Request from %s: %s %s", client_ip, method, req_path);
+    snprintf(log_msg, sizeof(log_msg), "HTTPS Request from %s: %s %s",
+             client_ip, method, req_path);
     log_message(LOG_LEVEL_INFO, log_msg);
-    
+
     // Security: prevent directory traversal
     if (strstr(req_path, "..")) {
         // For simplicity, just close connection on malicious-looking paths
-        snprintf(log_msg, sizeof(log_msg), "Directory traversal attempt from %s blocked.", client_ip);
+        snprintf(log_msg, sizeof(log_msg),
+                 "Directory traversal attempt from %s blocked.", client_ip);
         log_message(LOG_LEVEL_ERROR, log_msg);
         SSL_shutdown(ssl);
         SSL_free(ssl);
@@ -235,9 +236,11 @@ void handle_https_request(SSL *ssl, const char* client_ip) {
 
     char file_path[BUFFER_SIZE];
     if (strcmp(req_path, "/") == 0) {
-        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root, DEFAULT_PAGE);
+        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root,
+                 DEFAULT_PAGE);
     } else {
-        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root, req_path);
+        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root,
+                 req_path);
     }
 
     struct stat file_stat;
@@ -246,16 +249,19 @@ void handle_https_request(SSL *ssl, const char* client_ip) {
 
     if (stat(file_path, &file_stat) < 0 || !S_ISREG(file_stat.st_mode)) {
         status_code = 404;
-        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root, NOT_FOUND_PAGE);
-        stat(file_path, &file_stat); // Get stats for the 404 page
-        snprintf(log_msg, sizeof(log_msg), "File not found: %s. Responding with 404.", req_path);
+        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root,
+                 NOT_FOUND_PAGE);
+        stat(file_path, &file_stat);  // Get stats for the 404 page
+        snprintf(log_msg, sizeof(log_msg),
+                 "File not found: %s. Responding with 404.", req_path);
         log_message(LOG_LEVEL_INFO, log_msg);
     }
 
     file_fd = open(file_path, O_RDONLY);
     if (file_fd < 0) {
         // If even the 404 page can't be opened, something is very wrong.
-        log_message(LOG_LEVEL_ERROR, "Could not open 404 page, closing connection.");
+        log_message(LOG_LEVEL_ERROR,
+                    "Could not open 404 page, closing connection.");
         SSL_shutdown(ssl);
         SSL_free(ssl);
         close(client_socket);
@@ -270,12 +276,13 @@ void handle_https_request(SSL *ssl, const char* client_ip) {
              "Content-Length: %ld\r\n"
              "Server: ANX-Static/0.5.0\r\n"
              "Connection: close\r\n\r\n",
-             status_code, (status_code == 200) ? "OK" : "Not Found",
-             mime_type, file_stat.st_size);
+             status_code, (status_code == 200) ? "OK" : "Not Found", mime_type,
+             file_stat.st_size);
 
     SSL_write(ssl, header, strlen(header));
 
-    // sendfile doesn't work with SSL sockets directly, so we need to read and write.
+    // sendfile doesn't work with SSL sockets directly, so we need to read and
+    // write.
     char file_buffer[BUFFER_SIZE];
     ssize_t bytes_sent;
     while ((bytes_read = read(file_fd, file_buffer, sizeof(file_buffer))) > 0) {
@@ -283,7 +290,8 @@ void handle_https_request(SSL *ssl, const char* client_ip) {
         if (bytes_sent <= 0) {
             int ssl_error = SSL_get_error(ssl, bytes_sent);
             if (ssl_error != SSL_ERROR_WANT_WRITE) {
-                log_message(LOG_LEVEL_ERROR, "SSL_write error during sendfile emulation.");
+                log_message(LOG_LEVEL_ERROR,
+                            "SSL_write error during sendfile emulation.");
                 ERR_print_errors_fp(stderr);
                 break;
             }
@@ -296,7 +304,7 @@ void handle_https_request(SSL *ssl, const char* client_ip) {
     close(client_socket);
 }
 
-void handle_http_request(int client_socket, const char* client_ip) {
+void handle_http_request(int client_socket, const char *client_ip) {
     char buffer[BUFFER_SIZE] = {0};
     ssize_t bytes_read = read(client_socket, buffer, BUFFER_SIZE - 1);
 
@@ -312,19 +320,22 @@ void handle_http_request(int client_socket, const char* client_ip) {
     char *req_path = strtok(NULL, " \t\r\n");
 
     if (!method || !req_path) {
-        log_message(LOG_LEVEL_ERROR, "Malformed http request, closing connection.");
+        log_message(LOG_LEVEL_ERROR,
+                    "Malformed http request, closing connection.");
         close(client_socket);
         return;
     }
 
     char log_msg[BUFFER_SIZE];
-    snprintf(log_msg, sizeof(log_msg), "HTTP Request from %s: %s %s", client_ip, method, req_path);
+    snprintf(log_msg, sizeof(log_msg), "HTTP Request from %s: %s %s", client_ip,
+             method, req_path);
     log_message(LOG_LEVEL_INFO, log_msg);
-    
+
     // Security: prevent directory traversal
     if (strstr(req_path, "..")) {
         // For simplicity, just close connection on malicious-looking paths
-        snprintf(log_msg, sizeof(log_msg), "Directory traversal attempt from %s blocked.", client_ip);
+        snprintf(log_msg, sizeof(log_msg),
+                 "Directory traversal attempt from %s blocked.", client_ip);
         log_message(LOG_LEVEL_ERROR, log_msg);
         close(client_socket);
         return;
@@ -332,9 +343,11 @@ void handle_http_request(int client_socket, const char* client_ip) {
 
     char file_path[BUFFER_SIZE];
     if (strcmp(req_path, "/") == 0) {
-        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root, DEFAULT_PAGE);
+        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root,
+                 DEFAULT_PAGE);
     } else {
-        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root, req_path);
+        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root,
+                 req_path);
     }
 
     struct stat file_stat;
@@ -343,16 +356,19 @@ void handle_http_request(int client_socket, const char* client_ip) {
 
     if (stat(file_path, &file_stat) < 0 || !S_ISREG(file_stat.st_mode)) {
         status_code = 404;
-        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root, NOT_FOUND_PAGE);
-        stat(file_path, &file_stat); // Get stats for the 404 page
-        snprintf(log_msg, sizeof(log_msg), "File not found: %s. Responding with 404.", req_path);
+        snprintf(file_path, sizeof(file_path), "%s%s", config.web_root,
+                 NOT_FOUND_PAGE);
+        stat(file_path, &file_stat);  // Get stats for the 404 page
+        snprintf(log_msg, sizeof(log_msg),
+                 "File not found: %s. Responding with 404.", req_path);
         log_message(LOG_LEVEL_INFO, log_msg);
     }
 
     file_fd = open(file_path, O_RDONLY);
     if (file_fd < 0) {
         // If even the 404 page can't be opened, something is very wrong.
-        log_message(LOG_LEVEL_ERROR, "Could not open 404 page, closing connection.");
+        log_message(LOG_LEVEL_ERROR,
+                    "Could not open 404 page, closing connection.");
         close(client_socket);
         return;
     }
@@ -365,8 +381,8 @@ void handle_http_request(int client_socket, const char* client_ip) {
              "Content-Length: %ld\r\n"
              "Server: ANX-Static/0.5.0\r\n"
              "Connection: close\r\n\r\n",
-             status_code, (status_code == 200) ? "OK" : "Not Found",
-             mime_type, file_stat.st_size);
+             status_code, (status_code == 200) ? "OK" : "Not Found", mime_type,
+             file_stat.st_size);
 
     write(client_socket, header, strlen(header));
     sendfile(client_socket, file_fd, NULL, file_stat.st_size);
@@ -386,7 +402,7 @@ void worker_loop(int server_fd, int https_server_fd, SSL_CTX *ssl_ctx) {
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &event) == -1) {
         error_and_exit("epoll_ctl (worker)");
     }
-    
+
     // Add HTTPS server socket to epoll
     event.data.fd = https_server_fd;
     event.events = EPOLLIN | EPOLLET;
@@ -399,9 +415,11 @@ void worker_loop(int server_fd, int https_server_fd, SSL_CTX *ssl_ctx) {
     while (1) {
         int n = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
         for (int i = 0; i < n; i++) {
-            if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP)) {
+            if ((events[i].events & EPOLLERR) ||
+                (events[i].events & EPOLLHUP)) {
                 char log_msg[128];
-                snprintf(log_msg, sizeof(log_msg), "epoll error on fd %d", events[i].data.fd);
+                snprintf(log_msg, sizeof(log_msg), "epoll error on fd %d",
+                         events[i].data.fd);
                 log_message(LOG_LEVEL_ERROR, log_msg);
                 close(events[i].data.fd);
                 continue;
@@ -413,16 +431,19 @@ void worker_loop(int server_fd, int https_server_fd, SSL_CTX *ssl_ctx) {
             while (1) {
                 struct sockaddr_in client_addr;
                 socklen_t client_len = sizeof(client_addr);
-                int client_fd = accept(current_server_fd, (struct sockaddr *)&client_addr, &client_len);
+                int client_fd =
+                    accept(current_server_fd, (struct sockaddr *)&client_addr,
+                           &client_len);
                 if (client_fd == -1) {
                     if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
-                       log_message(LOG_LEVEL_ERROR, "accept failed");
+                        log_message(LOG_LEVEL_ERROR, "accept failed");
                     }
                     break;
                 }
-                
+
                 char client_ip[INET_ADDRSTRLEN];
-                inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+                inet_ntop(AF_INET, &client_addr.sin_addr, client_ip,
+                          INET_ADDRSTRLEN);
 
                 if (is_https) {
                     SSL *ssl = SSL_new(ssl_ctx);
@@ -454,20 +475,21 @@ int create_server_socket(int port) {
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(port);
 
-    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) <
+        0) {
         char msg[100];
         snprintf(msg, sizeof(msg), "bind to port %d failed", port);
         error_and_exit(msg);
     }
-    
+
     if (listen(server_fd, 128) < 0) {
         error_and_exit("listen failed");
     }
-    
+
     if (make_socket_non_blocking(server_fd) == -1) {
         error_and_exit("make_socket_non_blocking failed");
     }
-    
+
     return server_fd;
 }
 
@@ -485,7 +507,7 @@ int main(int argc, char *argv[]) {
     SSL_library_init();
     OpenSSL_add_all_algorithms();
     SSL_load_error_strings();
-    
+
     ssl_ctx = SSL_CTX_new(TLS_server_method());
     if (!ssl_ctx) {
         ERR_print_errors_fp(stderr);
@@ -493,30 +515,33 @@ int main(int argc, char *argv[]) {
     }
 
     // Load certificate and private key
-    if (SSL_CTX_use_certificate_file(ssl_ctx, config.cert_file, SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_certificate_file(ssl_ctx, config.cert_file,
+                                     SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
-    if (SSL_CTX_use_PrivateKey_file(ssl_ctx, config.key_file, SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_PrivateKey_file(ssl_ctx, config.key_file,
+                                    SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
-
 
     // Create server sockets
     server_fd = create_server_socket(config.port);
     char msg[128];
     snprintf(msg, sizeof(msg), "HTTP server listening on port %d", config.port);
     log_message(LOG_LEVEL_INFO, msg);
-    
+
     https_server_fd = create_server_socket(config.https_port);
-    snprintf(msg, sizeof(msg), "HTTPS server listening on port %d", config.https_port);
+    snprintf(msg, sizeof(msg), "HTTPS server listening on port %d",
+             config.https_port);
     log_message(LOG_LEVEL_INFO, msg);
 
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    snprintf(msg, sizeof(msg), "Master process starting %d workers...", config.num_workers);
+    snprintf(msg, sizeof(msg), "Master process starting %d workers...",
+             config.num_workers);
     log_message(LOG_LEVEL_INFO, msg);
     for (int i = 0; i < config.num_workers; i++) {
         pid_t pid = fork();
@@ -525,7 +550,7 @@ int main(int argc, char *argv[]) {
         } else if (pid == 0) {
             // Child process
             worker_loop(server_fd, https_server_fd, ssl_ctx);
-            exit(0); // Should not be reached
+            exit(0);  // Should not be reached
         } else {
             // Parent process
             worker_pids[i] = pid;
@@ -537,12 +562,13 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < config.num_workers; i++) {
         wait(NULL);
     }
-    
-    log_message(LOG_LEVEL_INFO, "All workers have shut down. Master process exiting.");
+
+    log_message(LOG_LEVEL_INFO,
+                "All workers have shut down. Master process exiting.");
 
     close(server_fd);
     close(https_server_fd);
-    if(ssl_ctx) SSL_CTX_free(ssl_ctx);
+    if (ssl_ctx) SSL_CTX_free(ssl_ctx);
 
     return 0;
-} 
+}
