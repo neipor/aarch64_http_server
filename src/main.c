@@ -18,28 +18,12 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "log.h"
+#include "util.h"
 
-#define DEFAULT_PORT 8080
-#define DEFAULT_HTTPS_PORT 8443
-#define DEFAULT_WEB_ROOT "./www"
 #define BUFFER_SIZE 4096
 #define MAX_EVENTS 64
-#define DEFAULT_PAGE "/index.html"
-#define NOT_FOUND_PAGE "/404.html"
-
-// Configuration structure
-struct server_config {
-    int port;
-    int https_port;
-    char web_root[256];
-    char cert_file[256];
-    char key_file[256];
-    int num_workers;
-};
-
-// Global config
-struct server_config config;
 
 pid_t worker_pids[128];
 int num_workers_spawned = 0;
@@ -53,74 +37,6 @@ void signal_handler(int signum) {
         kill(worker_pids[i], SIGKILL);
     }
     // Let the main loop's wait() handle reaping
-}
-
-// In-place trim whitespace from start and end of a string
-void trim_whitespace(char *str) {
-    char *start = str;
-    while (isspace((unsigned char)*start)) {
-        start++;
-    }
-
-    char *end = str + strlen(str) - 1;
-    while (end > start && isspace((unsigned char)*end)) {
-        end--;
-    }
-
-    // Write new null terminator
-    *(end + 1) = '\0';
-
-    // Shift the string to the beginning
-    if (start != str) {
-        memmove(str, start, strlen(start) + 1);
-    }
-}
-
-void parse_config(const char *filename) {
-    // Set defaults first
-    config.port = DEFAULT_PORT;
-    config.https_port = DEFAULT_HTTPS_PORT;
-    strncpy(config.web_root, DEFAULT_WEB_ROOT, sizeof(config.web_root) - 1);
-    config.num_workers = 2;  // Default to 2 workers
-    strncpy(config.cert_file, "certs/server.crt", sizeof(config.cert_file) - 1);
-    strncpy(config.key_file, "certs/server.key", sizeof(config.key_file) - 1);
-
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        char msg[256];
-        snprintf(msg, sizeof(msg),
-                 "Config file '%s' not found, using defaults.", filename);
-        log_message(LOG_LEVEL_INFO, msg);
-        return;
-    }
-
-    char line[512];
-    while (fgets(line, sizeof(line), file)) {
-        if (line[0] == '#' || line[0] == '\n') continue;
-
-        char *key = strtok(line, "=");
-        char *value = strtok(NULL, "\n");
-
-        if (key && value) {
-            trim_whitespace(key);
-            trim_whitespace(value);
-
-            if (strcmp(key, "port") == 0) {
-                config.port = atoi(value);
-            } else if (strcmp(key, "https_port") == 0) {
-                config.https_port = atoi(value);
-            } else if (strcmp(key, "web_root") == 0) {
-                strncpy(config.web_root, value, sizeof(config.web_root) - 1);
-            } else if (strcmp(key, "cert_file") == 0) {
-                strncpy(config.cert_file, value, sizeof(config.cert_file) - 1);
-            } else if (strcmp(key, "key_file") == 0) {
-                strncpy(config.key_file, value, sizeof(config.key_file) - 1);
-            } else if (strcmp(key, "num_workers") == 0) {
-                config.num_workers = atoi(value);
-            }
-        }
-    }
-    fclose(file);
 }
 
 // Function to handle errors and exit
@@ -143,19 +59,6 @@ static int make_socket_non_blocking(int fd) {
         return -1;
     }
     return 0;
-}
-
-// Simple function to get MIME type from file extension
-const char *get_mime_type(const char *path) {
-    const char *dot = strrchr(path, '.');
-    if (!dot || dot == path) return "application/octet-stream";
-    if (strcmp(dot, ".html") == 0) return "text/html";
-    if (strcmp(dot, ".css") == 0) return "text/css";
-    if (strcmp(dot, ".js") == 0) return "application/javascript";
-    if (strcmp(dot, ".jpg") == 0) return "image/jpeg";
-    if (strcmp(dot, ".jpeg") == 0) return "image/jpeg";
-    if (strcmp(dot, ".png") == 0) return "image/png";
-    return "application/octet-stream";
 }
 
 void handle_https_request(SSL *ssl, const char *client_ip) {
