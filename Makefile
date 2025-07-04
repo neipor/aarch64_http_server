@@ -7,6 +7,9 @@ CC = gcc
 # -O2: Optimization level 2
 CFLAGS = -g -Wall -O2
 
+# Linker flags
+LDFLAGS = -lssl -lcrypto
+
 # Source files and Object files
 # Find all .c files in the src directory
 SRCS = $(wildcard src/*.c)
@@ -20,7 +23,7 @@ TARGET = anx
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS)
 
 build/%.o: src/%.c
 	@mkdir -p build
