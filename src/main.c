@@ -102,6 +102,11 @@ int main(int argc, char *argv[]) {
         int is_ssl = core_conf->listening_sockets[i].is_ssl;
         
         int fd = create_server_socket(port);
+        if (fd < 0) {
+            // Mark this socket as invalid, but don't exit
+            core_conf->listening_sockets[i].fd = -1;
+            continue; 
+        }
         core_conf->listening_sockets[i].fd = fd;
 
         char msg[128];
@@ -124,6 +129,7 @@ int main(int argc, char *argv[]) {
     char msg[128];
     snprintf(msg, sizeof(msg), "Master process starting %d workers...", core_conf->worker_processes);
     log_message(LOG_LEVEL_INFO, msg);
+    log_message(LOG_LEVEL_DEBUG, "--> main: Forking workers...");
     
     for (int i = 0; i < core_conf->worker_processes; i++) {
         pid_t pid = fork();
@@ -131,27 +137,43 @@ int main(int argc, char *argv[]) {
             perror("fork failed");
             exit(EXIT_FAILURE);
         } else if (pid == 0) {
-            worker_loop(http_fd, https_fd, ssl_ctx);
+            // Pass only the valid FDs
+            int worker_http_fd = -1;
+            int worker_https_fd = -1;
+            for (int j = 0; j < core_conf->listening_socket_count; j++) {
+                if(core_conf->listening_sockets[j].fd != -1) {
+                    if(core_conf->listening_sockets[j].is_ssl) {
+                        if (worker_https_fd == -1) worker_https_fd = core_conf->listening_sockets[j].fd;
+                    } else {
+                        if (worker_http_fd == -1) worker_http_fd = core_conf->listening_sockets[j].fd;
+                    }
+                }
+            }
+            worker_loop(worker_http_fd, worker_https_fd, ssl_ctx);
             exit(0);
         } else {
             worker_pids[i] = pid;
             num_workers_spawned++;
         }
     }
+    log_message(LOG_LEVEL_DEBUG, "--> main: All workers forked");
 
     for (int i = 0; i < core_conf->worker_processes; i++) {
         wait(NULL);
     }
 
     log_message(LOG_LEVEL_INFO, "All workers have shut down. Master process exiting.");
+    log_message(LOG_LEVEL_DEBUG, "--> main: Cleaning up...");
     
     for(int i = 0; i < core_conf->listening_socket_count; i++) {
-        close(core_conf->listening_sockets[i].fd);
+        if(core_conf->listening_sockets[i].fd != -1)
+            close(core_conf->listening_sockets[i].fd);
     }
 
     if (ssl_ctx) SSL_CTX_free(ssl_ctx);
     free_core_config(core_conf);
     free_config(g_config);
 
+    log_message(LOG_LEVEL_DEBUG, "--> main: END");
     return 0;
 }

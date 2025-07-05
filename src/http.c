@@ -9,6 +9,7 @@
 #include <fcntl.h>
 
 #include "config.h"
+#include "core.h"
 #include "log.h"
 #include "util.h"
 
@@ -16,30 +17,43 @@
 #define TEMP_DEFAULT_PAGE "/index.html"
 #define TEMP_NOT_FOUND_PAGE "/404.html"
 
+// Helper to parse Host header from request
+static char *get_host(const char *buffer) {
+    const char *host_hdr = "Host: ";
+    char *host_start = strcasestr(buffer, host_hdr);
+    if (!host_start) return NULL;
+
+    host_start += strlen(host_hdr);
+    char *host_end = strstr(host_start, "\r\n");
+    if (!host_end) return NULL;
+
+    return strndup(host_start, host_end - host_start);
+}
+
 void handle_http_request(int client_socket, const char *client_ip) {
-  char buffer[BUFFER_SIZE] = {0};
-  ssize_t bytes_read = read(client_socket, buffer, BUFFER_SIZE - 1);
+  char buffer[BUFFER_SIZE];
+  ssize_t bytes_read = read(client_socket, buffer, sizeof(buffer) - 1);
 
   if (bytes_read <= 0) {
-    if (bytes_read == -1 && errno != EAGAIN) {
-      log_message(LOG_LEVEL_ERROR, "read error on http socket");
-    }
     close(client_socket);
     return;
   }
+  buffer[bytes_read] = '\0';
 
-  char *method = strtok(buffer, " \t\r\n");
-  char *req_path = strtok(NULL, " \t\r\n");
+  char *buffer_copy = strdup(buffer);
+  char *method = strtok(buffer_copy, " ");
+  char *req_path = strtok(NULL, " ");
+  char *http_version = strtok(NULL, "\r\n");
+  char *host = get_host(buffer);
 
   if (!method || !req_path) {
-    log_message(LOG_LEVEL_ERROR, "Malformed http request, closing connection.");
     close(client_socket);
     return;
   }
 
   char log_msg[BUFFER_SIZE];
-  snprintf(log_msg, sizeof(log_msg), "HTTP Request from %s: %s %s", client_ip,
-           method, req_path);
+  snprintf(log_msg, sizeof(log_msg), "\"%s %s %s\" from %s (Host: %s)", method,
+           req_path, http_version, client_ip, host ? host : "none");
   log_message(LOG_LEVEL_INFO, log_msg);
 
   // Security: prevent directory traversal
@@ -52,12 +66,34 @@ void handle_http_request(int client_socket, const char *client_ip) {
     return;
   }
 
+  // --- Routing ---
+  route_t route = find_route(NULL, host, req_path); // core_conf is not needed yet
+  if (!route.server) {
+      // Send a 500 internal server error
+      const char *response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
+      write(client_socket, response, strlen(response));
+      free(host);
+      free(buffer_copy);
+      return;
+  }
+
+  // Determine the root directory from the matched route
+  const char *root = get_directive_value("root", route.server->directives, route.server->directive_count);
+  if (route.location) {
+      const char* loc_root = get_directive_value("root", route.location->directives, route.location->directive_count);
+      if (loc_root) root = loc_root; // Location root overrides server root
+  }
+  if (!root) {
+      // Fallback to a default if no root is specified anywhere
+      root = "./www";
+  }
+
   char file_path[BUFFER_SIZE];
   if (strcmp(req_path, "/") == 0) {
-    snprintf(file_path, sizeof(file_path), "%s%s", g_config->http->directives[1].value,
+    snprintf(file_path, sizeof(file_path), "%s%s", root,
              TEMP_DEFAULT_PAGE);
   } else {
-    snprintf(file_path, sizeof(file_path), "%s%s", g_config->http->directives[1].value, req_path);
+    snprintf(file_path, sizeof(file_path), "%s%s", root, req_path);
   }
 
   struct stat file_stat;
@@ -66,7 +102,7 @@ void handle_http_request(int client_socket, const char *client_ip) {
 
   if (stat(file_path, &file_stat) < 0 || !S_ISREG(file_stat.st_mode)) {
     status_code = 404;
-    snprintf(file_path, sizeof(file_path), "%s%s", g_config->http->directives[1].value,
+    snprintf(file_path, sizeof(file_path), "%s%s", root,
              TEMP_NOT_FOUND_PAGE);
     stat(file_path, &file_stat);  // Get stats for the 404 page
     snprintf(log_msg, sizeof(log_msg), "File not found: %s. Responding with 404.",
@@ -76,8 +112,7 @@ void handle_http_request(int client_socket, const char *client_ip) {
 
   file_fd = open(file_path, O_RDONLY);
   if (file_fd < 0) {
-    // If even the 404 page can't be opened, something is very wrong.
-    log_message(LOG_LEVEL_ERROR, "Could not open 404 page, closing connection.");
+    log_message(LOG_LEVEL_ERROR, "Could not open requested file.");
     close(client_socket);
     return;
   }
@@ -96,5 +131,8 @@ void handle_http_request(int client_socket, const char *client_ip) {
   write(client_socket, header, strlen(header));
   sendfile(client_socket, file_fd, NULL, file_stat.st_size);
   close(file_fd);
+  // Clean up
+  free(host);
+  free(buffer_copy);
   close(client_socket);
 } 

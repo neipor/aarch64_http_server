@@ -20,6 +20,16 @@ typedef struct {
   // We can add pointers to processed virtual host configs here later
 } core_config_t;
 
+// This struct holds the result of a routing decision.
+typedef struct {
+  server_block_t *server;
+  location_block_t *location; // NULL if no specific location matches
+} route_t;
+
+// Finds the best matching server and location block for a given request.
+route_t find_route(const core_config_t *core_conf, const char *host,
+                   const char *uri);
+
 // Processes the raw, parsed config tree (g_config) and populates a core_config_t
 core_config_t *create_core_config(config_t *parsed_config);
 

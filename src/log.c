@@ -32,6 +32,6 @@ void log_message(log_level_t level, const char *message) {
         break;
   }
 
-  fprintf(stdout, "[%s] %s[%s]\x1B[0m [%d] %s\n", time_buf, level_color,
+  fprintf(stderr, "[%s] %s[%s]\x1B[0m [%d] %s\n", time_buf, level_color,
           level_str, getpid(), message);
 } 

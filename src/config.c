@@ -9,6 +9,17 @@
 // The global config structure instance.
 config_t *g_config = NULL;
 
+const char *get_directive_value(const char *key, const directive_t *directives,
+                                int count) {
+  if (!directives) return NULL;
+  for (int i = 0; i < count; i++) {
+    if (directives[i].key && strcmp(directives[i].key, key) == 0) {
+      return directives[i].value;
+    }
+  }
+  return NULL;
+}
+
 // --- Private Helper Functions ---
 
 // Simple tokenizer state machine

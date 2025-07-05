@@ -41,6 +41,9 @@ typedef struct {
 // The global server configuration, accessible by all modules.
 extern config_t *g_config;
 
+// Helper function to find the value of a directive within an array.
+const char *get_directive_value(const char *key, const directive_t *directives, int count);
+
 // Function to parse the configuration file and populate the global config struct.
 config_t *parse_config(const char *filename);
 

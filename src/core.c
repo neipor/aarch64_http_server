@@ -3,19 +3,54 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "log.h"
 #include "net.h"
 
-// Helper to find a directive's value in a directive array
-static const char *get_directive_value(const char *key,
-                                       const directive_t *directives,
-                                       int count) {
-  for (int i = 0; i < count; i++) {
-    if (strcmp(directives[i].key, key) == 0) {
-      return directives[i].value;
+route_t find_route(const core_config_t *core_conf, const char *host,
+                   const char *uri) {
+  route_t route = {NULL, NULL};
+  if (!g_config || !g_config->http || !g_config->http->servers) {
+    return route;
+  }
+
+  // 1. Find the matching server block
+  server_block_t *matched_server = NULL;
+  server_block_t *default_server = g_config->http->servers; // First server is default
+
+  for (server_block_t *srv = g_config->http->servers; srv; srv = srv->next) {
+    const char *server_name = get_directive_value("server_name", srv->directives, srv->directive_count);
+    if (host && server_name && strcmp(host, server_name) == 0) {
+      matched_server = srv;
+      break;
     }
   }
-  return NULL;
+
+  if (!matched_server) {
+    matched_server = default_server;
+  }
+  route.server = matched_server;
+
+
+  // 2. Find the best matching location block within that server
+  if (matched_server) {
+    location_block_t *best_match = NULL;
+    size_t best_match_len = 0;
+
+    for (location_block_t *loc = matched_server->locations; loc; loc = loc->next) {
+      size_t loc_path_len = strlen(loc->path);
+      if (strncmp(uri, loc->path, loc_path_len) == 0) {
+        // It's a prefix match. Is it the best one so far?
+        if (loc_path_len > best_match_len) {
+          best_match = loc;
+          best_match_len = loc_path_len;
+        }
+      }
+    }
+    route.location = best_match;
+  }
+
+  return route;
 }
 
 core_config_t *create_core_config(config_t *parsed_config) {

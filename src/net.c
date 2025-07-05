@@ -81,23 +81,32 @@ int create_server_socket(int port) {
 
 void worker_loop(int server_fd, int https_server_fd, SSL_CTX *ssl_ctx) {
   int epoll_fd;
-  struct epoll_event event, events[MAX_EVENTS];
+  struct epoll_event event;
 
   epoll_fd = epoll_create1(0);
   if (epoll_fd == -1) error_and_exit("epoll_create1 (worker)");
 
-  event.data.fd = server_fd;
-  event.events = EPOLLIN | EPOLLET;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &event) == -1) {
-    error_and_exit("epoll_ctl (worker)");
+  if (server_fd != -1) {
+    event.data.fd = server_fd;
+    event.events = EPOLLIN;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &event) == -1) {
+        log_message(LOG_LEVEL_ERROR, "Failed to add http_fd to epoll");
+        close(epoll_fd);
+        return;
+    }
+  }
+  if (https_server_fd != -1) {
+    event.data.fd = https_server_fd;
+    event.events = EPOLLIN;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, https_server_fd, &event) == -1) {
+        log_message(LOG_LEVEL_ERROR, "Failed to add https_fd to epoll");
+        close(epoll_fd);
+        return;
+    }
   }
 
-  // Add HTTPS server socket to epoll
-  event.data.fd = https_server_fd;
-  event.events = EPOLLIN | EPOLLET;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, https_server_fd, &event) == -1) {
-    error_and_exit("epoll_ctl (worker)");
-  }
+  struct epoll_event events[MAX_EVENTS];
+  char client_ip[INET_ADDRSTRLEN];
 
   log_message(LOG_LEVEL_INFO, "Worker process started.");
 
@@ -129,7 +138,6 @@ void worker_loop(int server_fd, int https_server_fd, SSL_CTX *ssl_ctx) {
           break;
         }
 
-        char client_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
 
         if (is_https) {
