@@ -6,73 +6,284 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Define the global config structure instance.
-struct server_config config;
+// The global config structure instance.
+config_t *g_config = NULL;
 
-// In-place trim whitespace from start and end of a string
-static void trim_whitespace(char *str) {
-  char *start = str;
-  while (isspace((unsigned char)*start)) {
-    start++;
-  }
+// --- Private Helper Functions ---
 
-  char *end = str + strlen(str) - 1;
-  while (end > start && isspace((unsigned char)*end)) {
-    end--;
-  }
+// Simple tokenizer state machine
+typedef enum {
+  TOKEN_STATE_START,
+  TOKEN_STATE_WORD,
+  TOKEN_STATE_COMMENT
+} token_state_t;
 
-  // Write new null terminator
-  *(end + 1) = '\0';
+// For now, we'll use a simple static array for tokens.
+// A more robust implementation would use a dynamic array.
+#define MAX_TOKENS 2048
+static char *tokens[MAX_TOKENS];
+static int token_count = 0;
 
-  // Shift the string to the beginning
-  if (start != str) {
-    memmove(str, start, strlen(start) + 1);
+static void free_tokens() {
+    for (int i = 0; i < token_count; i++) {
+        free(tokens[i]);
+        tokens[i] = NULL;
+    }
+    token_count = 0;
+}
+
+static void tokenize(char *content) {
+  free_tokens();
+  token_state_t state = TOKEN_STATE_START;
+  char *start = content;
+
+  for (char *p = content; *p != '\0'; p++) {
+    if (token_count >= MAX_TOKENS) {
+        log_message(LOG_LEVEL_ERROR, "Exceeded maximum number of tokens.");
+        return;
+    }
+    switch (state) {
+      case TOKEN_STATE_START:
+        if (*p == '#') {
+          state = TOKEN_STATE_COMMENT;
+        } else if (isspace((unsigned char)*p)) {
+          // just skip
+        } else if (*p == '{' || *p == '}' || *p == ';') {
+          tokens[token_count++] = strndup(p, 1);
+        } else {
+          start = p;
+          state = TOKEN_STATE_WORD;
+        }
+        break;
+      case TOKEN_STATE_WORD:
+        if (isspace((unsigned char)*p) || *p == '{' || *p == '}' || *p == ';') {
+          tokens[token_count++] = strndup(start, p - start);
+          state = TOKEN_STATE_START;
+          p--;  // re-evaluate this character
+        }
+        break;
+      case TOKEN_STATE_COMMENT:
+        if (*p == '\n') {
+          state = TOKEN_STATE_START;
+        }
+        break;
+    }
   }
 }
 
-void parse_config(const char *filename) {
-  // Set defaults first
-  config.port = DEFAULT_PORT;
-  config.https_port = DEFAULT_HTTPS_PORT;
-  strncpy(config.web_root, DEFAULT_WEB_ROOT, sizeof(config.web_root) - 1);
-  config.num_workers = 2;  // Default to 2 workers
-  strncpy(config.cert_file, "certs/server.crt", sizeof(config.cert_file) - 1);
-  strncpy(config.key_file, "certs/server.key", sizeof(config.key_file) - 1);
+// --- Recursive Parsing Logic ---
+// Forward declarations
+static http_block_t *parse_http_block(int *token_idx);
+static server_block_t *parse_server_block(int *token_idx);
+static location_block_t *parse_location_block(int *token_idx);
+static directive_t parse_directive(int *token_idx);
 
+static directive_t parse_directive(int *token_idx) {
+    directive_t dir = {0};
+    if (*token_idx + 2 < token_count && strcmp(tokens[*token_idx + 2], ";") == 0) {
+        dir.key = strdup(tokens[*token_idx]);
+        dir.value = strdup(tokens[*token_idx + 1]);
+        *token_idx += 3;
+    } else {
+        log_message(LOG_LEVEL_ERROR, "Invalid directive syntax.");
+        // Skip to next semicolon to attempt recovery
+        while(*token_idx < token_count && strcmp(tokens[*token_idx], ";") != 0) {
+            (*token_idx)++;
+        }
+        (*token_idx)++;
+    }
+    return dir;
+}
+
+static location_block_t *parse_location_block(int *token_idx) {
+  if (strcmp(tokens[*token_idx], "location") != 0) {
+    log_message(LOG_LEVEL_ERROR, "Expected 'location' block.");
+    return NULL;
+  }
+  *token_idx += 1; // Consume 'location'
+
+  location_block_t *loc = calloc(1, sizeof(location_block_t));
+  loc->path = strdup(tokens[*token_idx]);
+  *token_idx += 1; // Consume path
+
+  if (strcmp(tokens[*token_idx], "{") != 0) {
+    log_message(LOG_LEVEL_ERROR, "Expected '{' after location path.");
+    free(loc->path);
+    free(loc);
+    return NULL;
+  }
+  *token_idx += 1; // Consume '{'
+  
+  loc->directives = NULL;
+  loc->directive_count = 0;
+
+  while (*token_idx < token_count && strcmp(tokens[*token_idx], "}") != 0) {
+      loc->directive_count++;
+      loc->directives =
+          realloc(loc->directives, sizeof(directive_t) * loc->directive_count);
+      loc->directives[loc->directive_count - 1] = parse_directive(token_idx);
+  }
+  
+  if (strcmp(tokens[*token_idx], "}") != 0) {
+      log_message(LOG_LEVEL_ERROR, "Location block not closed with '}'.");
+  }
+  *token_idx += 1;  // Consume '}'
+  return loc;
+}
+
+static server_block_t *parse_server_block(int *token_idx) {
+  if (strcmp(tokens[*token_idx], "server") != 0 ||
+      strcmp(tokens[*token_idx + 1], "{") != 0) {
+    log_message(LOG_LEVEL_ERROR, "Expected 'server {' block.");
+    return NULL;
+  }
+  *token_idx += 2;  // Consume 'server' and '{'
+
+  server_block_t *srv = calloc(1, sizeof(server_block_t));
+  srv->directives = NULL;
+  srv->directive_count = 0;
+  srv->locations = NULL;
+
+  while (*token_idx < token_count && strcmp(tokens[*token_idx], "}") != 0) {
+    if (strcmp(tokens[*token_idx], "location") == 0) {
+      location_block_t* loc = parse_location_block(token_idx);
+      loc->next = srv->locations;
+      srv->locations = loc;
+    } else {
+      // It's a directive
+      srv->directive_count++;
+      srv->directives =
+          realloc(srv->directives, sizeof(directive_t) * srv->directive_count);
+      srv->directives[srv->directive_count - 1] = parse_directive(token_idx);
+    }
+  }
+  
+  if (strcmp(tokens[*token_idx], "}") != 0) {
+      log_message(LOG_LEVEL_ERROR, "Server block not closed with '}'.");
+  }
+  *token_idx += 1;  // Consume '}'
+  return srv;
+}
+
+static http_block_t *parse_http_block(int *token_idx) {
+  if (strcmp(tokens[*token_idx], "http") != 0 ||
+      strcmp(tokens[*token_idx + 1], "{") != 0) {
+    log_message(LOG_LEVEL_ERROR, "Expected 'http {' block.");
+    return NULL;
+  }
+  *token_idx += 2;  // Consume 'http' and '{'
+
+  http_block_t *http = calloc(1, sizeof(http_block_t));
+  http->directives = NULL;
+  http->directive_count = 0;
+  http->servers = NULL;
+
+  while (*token_idx < token_count && strcmp(tokens[*token_idx], "}") != 0) {
+    if (strcmp(tokens[*token_idx], "server") == 0) {
+      server_block_t* srv = parse_server_block(token_idx);
+      srv->next = http->servers;
+      http->servers = srv;
+    } else {
+      // It's a directive
+      http->directive_count++;
+      http->directives =
+          realloc(http->directives, sizeof(directive_t) * http->directive_count);
+      http->directives[http->directive_count - 1] = parse_directive(token_idx);
+    }
+  }
+
+  if (strcmp(tokens[*token_idx], "}") != 0) {
+      log_message(LOG_LEVEL_ERROR, "Http block not closed with '}'.");
+  }
+  *token_idx += 1;  // Consume '}'
+  return http;
+}
+
+// --- Public API ---
+
+config_t *parse_config(const char *filename) {
   FILE *file = fopen(filename, "r");
   if (!file) {
     char msg[256];
-    snprintf(msg, sizeof(msg), "Config file '%s' not found, using defaults.",
-             filename);
-    log_message(LOG_LEVEL_INFO, msg);
-    return;
+    snprintf(msg, sizeof(msg), "Config file '%s' not found.", filename);
+    log_message(LOG_LEVEL_ERROR, msg);
+    return NULL;
   }
 
-  char line[512];
-  while (fgets(line, sizeof(line), file)) {
-    if (line[0] == '#' || line[0] == '\n') continue;
+  fseek(file, 0, SEEK_END);
+  long length = ftell(file);
+  fseek(file, 0, SEEK_SET);
 
-    char *key = strtok(line, "=");
-    char *value = strtok(NULL, "\n");
+  char *content = malloc(length + 1);
+  if (!content) {
+    log_message(LOG_LEVEL_ERROR, "Could not allocate memory for config file.");
+    fclose(file);
+    return NULL;
+  }
+  fread(content, 1, length, file);
+  content[length] = '\0';
+  fclose(file);
 
-    if (key && value) {
-      trim_whitespace(key);
-      trim_whitespace(value);
+  tokenize(content);
+  free(content);
 
-      if (strcmp(key, "port") == 0) {
-        config.port = atoi(value);
-      } else if (strcmp(key, "https_port") == 0) {
-        config.https_port = atoi(value);
-      } else if (strcmp(key, "web_root") == 0) {
-        strncpy(config.web_root, value, sizeof(config.web_root) - 1);
-      } else if (strcmp(key, "cert_file") == 0) {
-        strncpy(config.cert_file, value, sizeof(config.cert_file) - 1);
-      } else if (strcmp(key, "key_file") == 0) {
-        strncpy(config.key_file, value, sizeof(config.key_file) - 1);
-      } else if (strcmp(key, "num_workers") == 0) {
-        config.num_workers = atoi(value);
-      }
+  config_t *new_config = calloc(1, sizeof(config_t));
+  int token_idx = 0;
+  while (token_idx < token_count) {
+    if (strcmp(tokens[token_idx], "http") == 0) {
+      new_config->http = parse_http_block(&token_idx);
+    } else {
+      // Skip unknown top-level blocks for now
+      log_message(LOG_LEVEL_DEBUG, "Skipping unknown top-level block");
+      token_idx++;
     }
   }
-  fclose(file);
+
+  // Debug print the parsed directives
+  if (new_config->http) {
+    log_message(LOG_LEVEL_DEBUG, "--- Parsed Configuration ---");
+    for (int i = 0; i < new_config->http->directive_count; i++) {
+      printf("http > %s: %s\n", new_config->http->directives[i].key,
+             new_config->http->directives[i].value);
+    }
+    server_block_t *srv = new_config->http->servers;
+    int server_num = 0;
+    while (srv) {
+      printf("http > server #%d:\n", server_num++);
+      for (int i = 0; i < srv->directive_count; i++) {
+        // Note: some values can be multipart, like 'listen 443 ssl'
+        // Our simple key/value directive parser won't handle that correctly yet.
+        if (srv->directives[i].key && srv->directives[i].value) {
+            printf("  %s: %s\n", srv->directives[i].key,
+                   srv->directives[i].value);
+        }
+      }
+      location_block_t *loc = srv->locations;
+      while(loc) {
+          printf("  location %s:\n", loc->path);
+          for (int i = 0; i < loc->directive_count; i++) {
+              if(loc->directives[i].key && loc->directives[i].value) {
+                  printf("    %s: %s\n", loc->directives[i].key, loc->directives[i].value);
+              }
+          }
+          loc = loc->next;
+      }
+      srv = srv->next;
+    }
+    printf("--- End Parsed Configuration ---\n");
+  }
+
+  // Cleanup tokens after use
+  free_tokens();
+
+  return new_config;
+}
+
+void free_config(config_t *config) {
+    if (!config) return;
+
+    // This function will need to be much more thorough later on
+    // to free all the nested blocks and directives.
+
+    free(config);
 } 
