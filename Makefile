@@ -12,8 +12,16 @@ LDFLAGS = -lssl -lcrypto
 
 # Source files and Object files
 # Find all .c files in the src directory
-SRCS = $(wildcard src/*.c)
-OBJS = $(patsubst src/%.c, build/%.o, $(SRCS))
+SRCS = src/config.c \
+       src/http.c \
+       src/https.c \
+       src/log.c \
+       src/main.c \
+       src/net.c \
+       src/util.c \
+       src/core.c
+
+OBJS = $(SRCS:src/%.c=build/%.o)
 
 # Target executable
 TARGET = anx

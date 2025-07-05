@@ -1,0 +1,29 @@
+#ifndef CORE_H
+#define CORE_H
+
+#include "config.h"
+
+// Represents a single listening endpoint (a socket)
+typedef struct {
+  int fd;
+  int port;
+  int is_ssl;
+  char *ssl_certificate;
+  char *ssl_certificate_key;
+} listening_socket_t;
+
+// Contains the core, processed configuration needed for the server to run.
+typedef struct {
+  int worker_processes;
+  listening_socket_t *listening_sockets;
+  int listening_socket_count;
+  // We can add pointers to processed virtual host configs here later
+} core_config_t;
+
+// Processes the raw, parsed config tree (g_config) and populates a core_config_t
+core_config_t *create_core_config(config_t *parsed_config);
+
+// Frees all resources associated with the core config
+void free_core_config(core_config_t *core_config);
+
+#endif  // CORE_H 

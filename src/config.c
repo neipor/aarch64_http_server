@@ -79,20 +79,40 @@ static location_block_t *parse_location_block(int *token_idx);
 static directive_t parse_directive(int *token_idx);
 
 static directive_t parse_directive(int *token_idx) {
-    directive_t dir = {0};
-    if (*token_idx + 2 < token_count && strcmp(tokens[*token_idx + 2], ";") == 0) {
-        dir.key = strdup(tokens[*token_idx]);
-        dir.value = strdup(tokens[*token_idx + 1]);
-        *token_idx += 3;
-    } else {
-        log_message(LOG_LEVEL_ERROR, "Invalid directive syntax.");
-        // Skip to next semicolon to attempt recovery
-        while(*token_idx < token_count && strcmp(tokens[*token_idx], ";") != 0) {
-            (*token_idx)++;
-        }
-        (*token_idx)++;
-    }
+  directive_t dir = {0};
+
+  if (*token_idx + 1 >= token_count) {
+    log_message(LOG_LEVEL_ERROR, "Unexpected end of config, expected a directive.");
     return dir;
+  }
+
+  dir.key = strdup(tokens[*token_idx]);
+  (*token_idx)++;
+
+  // Combine all tokens until a semicolon into the value
+  char value_buffer[1024] = {0};
+  int value_len = 0;
+  while (*token_idx < token_count && strcmp(tokens[*token_idx], ";") != 0) {
+    if (value_len > 0) {
+      strncat(value_buffer, " ", sizeof(value_buffer) - value_len -1);
+      value_len++;
+    }
+    strncat(value_buffer, tokens[*token_idx], sizeof(value_buffer) - value_len - 1);
+    value_len += strlen(tokens[*token_idx]);
+    (*token_idx)++;
+  }
+
+  if (strlen(value_buffer) > 0) {
+    dir.value = strdup(value_buffer);
+  }
+
+  if (*token_idx < token_count && strcmp(tokens[*token_idx], ";") == 0) {
+    (*token_idx)++;  // Consume semicolon
+  } else {
+    log_message(LOG_LEVEL_WARNING, "Directive not terminated with ';'.");
+  }
+
+  return dir;
 }
 
 static location_block_t *parse_location_block(int *token_idx) {
@@ -279,11 +299,52 @@ config_t *parse_config(const char *filename) {
   return new_config;
 }
 
+static void free_directive(directive_t *dir) {
+    if (!dir) return;
+    free(dir->key);
+    dir->key = NULL;
+    free(dir->value);
+    dir->value = NULL;
+}
+
+static void free_location_block(location_block_t *loc) {
+    if (!loc) return;
+    free(loc->path);
+    for (int i = 0; i < loc->directive_count; i++) {
+        free_directive(&loc->directives[i]);
+    }
+    free(loc->directives);
+    if(loc->next) {
+        free_location_block(loc->next);
+    }
+    free(loc);
+}
+
+static void free_server_block(server_block_t *srv) {
+    if (!srv) return;
+    for (int i = 0; i < srv->directive_count; i++) {
+        free_directive(&srv->directives[i]);
+    }
+    free(srv->directives);
+    free_location_block(srv->locations);
+    if(srv->next) {
+        free_server_block(srv->next);
+    }
+    free(srv);
+}
+
+static void free_http_block(http_block_t *http) {
+    if (!http) return;
+    for (int i = 0; i < http->directive_count; i++) {
+        free_directive(&http->directives[i]);
+    }
+    free(http->directives);
+    free_server_block(http->servers);
+    free(http);
+}
+
 void free_config(config_t *config) {
-    if (!config) return;
-
-    // This function will need to be much more thorough later on
-    // to free all the nested blocks and directives.
-
-    free(config);
+  if (!config) return;
+  free_http_block(config->http);
+  free(config);
 } 
