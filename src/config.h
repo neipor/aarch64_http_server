@@ -2,6 +2,9 @@
 #define CONFIG_H
 
 #include <openssl/ssl.h>
+#include <stdbool.h>
+#include "log.h"
+#include "compress.h"
 
 // Represents a single "key value;" directive in nginx config
 typedef struct {
@@ -36,6 +39,17 @@ typedef struct {
 typedef struct {
   http_block_t *http;
   // We can add other top-level blocks like 'events' here later
+  int worker_processes;
+  char *error_log;
+  char *access_log;
+  log_level_t log_level;
+  access_log_format_t log_format;
+  int log_rotation_size;
+  int log_rotation_days;
+  bool enable_performance_logging;
+  
+  // 压缩配置
+  compress_config_t *compress;
 } config_t;
 
 // Helper function to find the value of a directive within an array.
@@ -49,5 +63,14 @@ void free_config(config_t *config);
 
 // Helper function to resolve relative paths based on config file location
 char* resolve_config_path(const char* path);
+
+// Extract logging configuration from parsed config
+log_config_t *extract_log_config(const config_t *config);
+
+// Parse log format string to enum
+access_log_format_t parse_log_format(const char *format_str);
+
+// Get default log configuration
+log_config_t *get_default_log_config(void);
 
 #endif  // CONFIG_H 

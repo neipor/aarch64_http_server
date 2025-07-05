@@ -1,5 +1,6 @@
 #include "config.h"
 #include "log.h"
+#include "compress.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -294,6 +295,15 @@ config_t *parse_config(const char *filename) {
     free(content);
 
     config_t *new_config = calloc(1, sizeof(config_t));
+    
+    // 初始化压缩配置
+    new_config->compress = compress_config_create();
+    if (!new_config->compress) {
+        log_message(LOG_LEVEL_ERROR, "Failed to create compression config");
+        free(new_config);
+        return NULL;
+    }
+    
     int token_idx = 0;
     while (token_idx < token_count) {
         if (strcmp(tokens[token_idx], "http") == 0) {
@@ -302,6 +312,16 @@ config_t *parse_config(const char *filename) {
             // Skip unknown top-level blocks for now
             log_message(LOG_LEVEL_DEBUG, "Skipping unknown top-level block");
             token_idx++;
+        }
+    }
+    
+    // 处理HTTP块中的压缩指令
+    if (new_config->http) {
+        for (int i = 0; i < new_config->http->directive_count; i++) {
+            const directive_t *dir = &new_config->http->directives[i];
+            if (strncmp(dir->key, "gzip", 4) == 0) {
+                handle_compression_directive(new_config, dir->key, dir->value);
+            }
         }
     }
 
@@ -392,5 +412,212 @@ static void free_http_block(http_block_t *http) {
 void free_config(config_t *config) {
   if (!config) return;
   free_http_block(config->http);
+  if (config->compress) {
+    compress_config_free(config->compress);
+  }
   free(config);
+}
+
+// Parse log format string to enum
+access_log_format_t parse_log_format(const char *format_str) {
+    if (!format_str) return ACCESS_LOG_FORMAT_COMBINED;
+    
+    if (strcmp(format_str, "common") == 0) {
+        return ACCESS_LOG_FORMAT_COMMON;
+    } else if (strcmp(format_str, "combined") == 0) {
+        return ACCESS_LOG_FORMAT_COMBINED;
+    } else if (strcmp(format_str, "json") == 0) {
+        return ACCESS_LOG_FORMAT_JSON;
+    } else {
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Unknown log format '%s', using combined", format_str);
+        log_message(LOG_LEVEL_WARNING, msg);
+        return ACCESS_LOG_FORMAT_COMBINED;
+    }
+}
+
+// Get default log configuration
+log_config_t *get_default_log_config(void) {
+    log_config_t *config = calloc(1, sizeof(log_config_t));
+    if (!config) return NULL;
+    
+    config->error_log_file = strdup("stderr");
+    config->access_log_file = strdup("access.log");
+    config->error_log_level = LOG_LEVEL_INFO;
+    config->access_log_format = ACCESS_LOG_FORMAT_COMBINED;
+    config->log_rotation_size_mb = 100;
+    config->log_rotation_days = 7;
+    config->enable_performance_logging = 0;
+    
+    return config;
+}
+
+// Extract logging configuration from parsed config
+log_config_t *extract_log_config(const config_t *config) {
+    if (!config || !config->http) {
+        return get_default_log_config();
+    }
+    
+    log_config_t *log_config = get_default_log_config();
+    if (!log_config) return NULL;
+    
+    // Parse http-level logging directives
+    const char *error_log = get_directive_value("error_log", config->http->directives, 
+                                               config->http->directive_count);
+    const char *access_log = get_directive_value("access_log", config->http->directives, 
+                                                config->http->directive_count);
+    const char *log_level = get_directive_value("log_level", config->http->directives, 
+                                               config->http->directive_count);
+    const char *log_format = get_directive_value("log_format", config->http->directives, 
+                                                config->http->directive_count);
+    const char *log_rotation_size = get_directive_value("log_rotation_size", config->http->directives, 
+                                                       config->http->directive_count);
+    const char *log_rotation_days = get_directive_value("log_rotation_days", config->http->directives, 
+                                                       config->http->directive_count);
+    const char *performance_logging = get_directive_value("performance_logging", config->http->directives, 
+                                                         config->http->directive_count);
+    
+    // Apply configuration values
+    if (error_log) {
+        free(log_config->error_log_file);
+        log_config->error_log_file = resolve_config_path(error_log);
+    }
+    
+    if (access_log) {
+        free(log_config->access_log_file);
+        if (strcmp(access_log, "off") == 0) {
+            log_config->access_log_file = strdup("off");
+        } else {
+            log_config->access_log_file = resolve_config_path(access_log);
+        }
+    }
+    
+    if (log_level) {
+        if (strcmp(log_level, "error") == 0) {
+            log_config->error_log_level = LOG_LEVEL_ERROR;
+        } else if (strcmp(log_level, "warning") == 0) {
+            log_config->error_log_level = LOG_LEVEL_WARNING;
+        } else if (strcmp(log_level, "info") == 0) {
+            log_config->error_log_level = LOG_LEVEL_INFO;
+        } else if (strcmp(log_level, "debug") == 0) {
+            log_config->error_log_level = LOG_LEVEL_DEBUG;
+        }
+    }
+    
+    if (log_format) {
+        log_config->access_log_format = parse_log_format(log_format);
+    }
+    
+    if (log_rotation_size) {
+        log_config->log_rotation_size_mb = atoi(log_rotation_size);
+        if (log_config->log_rotation_size_mb <= 0) {
+            log_config->log_rotation_size_mb = 100;
+        }
+    }
+    
+    if (log_rotation_days) {
+        log_config->log_rotation_days = atoi(log_rotation_days);
+        if (log_config->log_rotation_days <= 0) {
+            log_config->log_rotation_days = 7;
+        }
+    }
+    
+    if (performance_logging) {
+        log_config->enable_performance_logging = (strcmp(performance_logging, "on") == 0) ? 1 : 0;
+    }
+    
+    return log_config;
+}
+
+// 处理压缩配置指令
+int handle_compression_directive(config_t *config, const char *directive, const char *value) {
+    if (!config || !config->compress) {
+        return -1;
+    }
+    
+    if (strcmp(directive, "gzip") == 0) {
+        config->compress->enable_compression = (strcmp(value, "on") == 0);
+    }
+    else if (strcmp(directive, "gzip_comp_level") == 0) {
+        int level = atoi(value);
+        if (level >= 1 && level <= 9) {
+            config->compress->level = level;
+        }
+    }
+    else if (strcmp(directive, "gzip_min_length") == 0) {
+        int length = atoi(value);
+        if (length > 0) {
+            config->compress->min_length = length;
+        }
+    }
+    else if (strcmp(directive, "gzip_types") == 0) {
+        // 清除现有MIME类型
+        for (int i = 0; i < config->compress->mime_types_count; i++) {
+            free(config->compress->mime_types[i]);
+        }
+        config->compress->mime_types_count = 0;
+        
+        // 解析新的MIME类型列表
+        char *types = strdup(value);
+        char *type = strtok(types, " ");
+        while (type) {
+            compress_config_add_mime_type(config->compress, type);
+            type = strtok(NULL, " ");
+        }
+        free(types);
+    }
+    else if (strcmp(directive, "gzip_vary") == 0) {
+        config->compress->enable_vary = (strcmp(value, "on") == 0);
+    }
+    else if (strcmp(directive, "gzip_buffers") == 0) {
+        int size = atoi(value);
+        if (size > 0) {
+            config->compress->compression_buffer_size = size * 1024;  // 转换为字节
+        }
+    }
+    
+    return 0;
+}
+
+// 初始化配置
+config_t *config_create(void) {
+    config_t *config = calloc(1, sizeof(config_t));
+    if (!config) {
+        return NULL;
+    }
+    
+    // 初始化压缩配置
+    config->compress = compress_config_create();
+    if (!config->compress) {
+        free(config);
+        return NULL;
+    }
+    
+    // ... existing initialization code ...
+    
+    return config;
+}
+
+// 释放配置
+void config_free(config_t *config) {
+    if (!config) return;
+    
+    // 释放压缩配置
+    if (config->compress) {
+        compress_config_free(config->compress);
+    }
+    
+    // ... existing cleanup code ...
+    
+    free(config);
+}
+
+// 处理配置指令
+int handle_config_directive(config_t *config, const char *directive, const char *value) {
+    // 处理压缩相关指令
+    if (strncmp(directive, "gzip", 4) == 0) {
+        return handle_compression_directive(config, directive, value);
+    }
+    
+    return 0;
 } 

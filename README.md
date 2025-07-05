@@ -1,244 +1,155 @@
 # ANX HTTP Server
 
-A high-performance, Nginx-inspired HTTP/HTTPS server written in C, designed to be lightweight, secure, and production-ready.
+ANX is a high-performance HTTP/HTTPS server written in C, designed to be fast, secure, and feature-rich while maintaining simplicity and ease of use.
 
-## 🚀 Current Status (v0.2.0)
+## Features
 
-ANX successfully implements core HTTP server functionality with modern architecture:
+- **HTTP/HTTPS Support**
+  - HTTP/1.1 protocol support
+  - HTTPS with SSL/TLS
+  - Virtual hosts
+  - Location-based routing
 
-### ✅ Working Features
-- **HTTP/1.1 and HTTPS** support with SSL/TLS encryption
-- **Multi-process architecture** (master + worker processes)
-- **Virtual hosts** with `server_name` directive support
-- **Location-based routing** for flexible request handling
-- **Static file serving** with automatic MIME type detection
-- **Nginx-style configuration** syntax (`http {}`, `server {}`, `location {}`)
-- **Epoll-based event handling** for high concurrency
-- **"Green" deployment** - portable with configurable paths
-- **Docker containerization** for development and testing
-- **Automated testing** with comprehensive test suite
+- **Performance**
+  - Multi-process architecture
+  - Epoll-based event handling
+  - Keep-alive connections
+  - Static file serving optimization
+  - Content compression (NEW in v0.6.0)
 
-### 🎯 Performance
-- **Multi-process concurrent handling** using epoll
-- **Non-blocking I/O** for optimal performance
-- **SSL/TLS optimization** with proper certificate handling
-- **Memory-safe** implementation with proper resource cleanup
+- **Reverse Proxy**
+  - Backend connection pooling
+  - Load balancing (coming soon)
+  - Upstream health checks
+  - Proxy protocol support
 
-## 📋 Quick Start
+- **Security**
+  - SSL/TLS support
+  - Security headers
+  - Access control
+  - Rate limiting (coming soon)
+
+- **Logging & Monitoring**
+  - Access log with multiple formats
+  - Error log with levels
+  - Performance metrics
+  - Log rotation
+
+- **Content Optimization**
+  - Gzip compression
+  - Static file caching
+  - MIME type detection
+  - Conditional requests
+
+## Installation
 
 ### Prerequisites
-- GCC compiler
-- OpenSSL development libraries
-- Make build system
-- Docker (optional, for containerized development)
 
-### Build and Run
+- Linux system (tested on Ubuntu 20.04+)
+- GCC compiler
+- Make build system
+- OpenSSL development libraries
+- zlib development libraries
+
 ```bash
+# Install dependencies on Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install gcc make libssl-dev zlib1g-dev
+
 # Clone the repository
-git clone <repository-url>
-cd asm_http_server
+git clone https://github.com/yourusername/anx-http-server.git
+cd anx-http-server
 
 # Build the server
 make clean && make
 
-# Run with default configuration
-./anx
-
-# Run with custom configuration
-./anx -c /path/to/your/config.conf
-
-# Run automated tests
-make test
+# Run the server
+./anx -c server.conf
 ```
 
-### Docker Development
-```bash
-# Build development environment
-make docker-build-dev
+## Configuration
 
-# Run in container
-make docker-run-dev
-```
-
-## ⚙️ Configuration
-
-ANX uses Nginx-compatible configuration syntax:
+ANX uses an Nginx-style configuration format. Here's a basic example:
 
 ```nginx
 http {
-    workers 2;
+    # Basic settings
+    workers 4;
+    error_log ./logs/error.log;
+    access_log ./logs/access.log;
+    
+    # Compression settings
+    gzip on;
+    gzip_comp_level 6;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/javascript application/javascript 
+              application/json application/xml text/xml application/x-javascript
+              text/html;
+    gzip_vary on;
+    gzip_buffers 32 4k;
     
     server {
-        listen 80;
+        listen 8080;
         server_name localhost;
-        root www;
-        index index.html;
-    }
-    
-    server {
-        listen 443 ssl;
-        server_name localhost;
-        root www;
-        index index.html;
-        ssl_certificate certs/server.crt;
-        ssl_certificate_key certs/server.key;
         
-        location /api {
-            proxy_pass http://127.0.0.1:3000;
+        location / {
+            root ./www;
         }
         
-        location /static {
-            index index.html;
+        location /api {
+            proxy_pass http://localhost:3000;
         }
     }
 }
 ```
 
-### Supported Directives
-- `workers` - Number of worker processes
-- `listen` - Port and protocol (HTTP/HTTPS)
-- `server_name` - Virtual host matching
-- `root` - Document root directory
-- `index` - Default index files
-- `ssl_certificate` / `ssl_certificate_key` - SSL/TLS certificates
-- `proxy_pass` - Reverse proxy configuration (✅ **COMPLETE v0.3.0**)
-- `add_header` - HTTP header manipulation (✅ **COMPLETE v0.4.0**)
+## Testing
 
-## 🏗️ Architecture
-
-### Process Model
-```
-Master Process
-├── Worker Process 1 (epoll event loop)
-├── Worker Process 2 (epoll event loop)
-└── Worker Process N (epoll event loop)
-```
-
-### Request Flow
-1. **Connection Accept** - Worker accepts client connection
-2. **SSL Handshake** - Performs SSL negotiation (if HTTPS)
-3. **Request Parsing** - Parses HTTP request headers
-4. **Routing** - Matches request to server/location blocks
-5. **Response Generation** - Serves static files or proxies to backend
-6. **Connection Cleanup** - Properly closes connection and frees resources
-
-### Module Structure
-- `src/main.c` - Master process and worker management
-- `src/config.c` - Configuration file parsing
-- `src/core.c` - Core configuration processing and routing
-- `src/net.c` - Network handling and event loops
-- `src/http.c` - HTTP request/response handling
-- `src/https.c` - HTTPS/SSL request handling
-- `src/log.c` - Logging infrastructure
-- `src/util.c` - Utility functions (MIME types, etc.)
-
-## 🧪 Testing
-
-ANX includes comprehensive automated testing:
+ANX comes with comprehensive test suites:
 
 ```bash
-# Run all tests with Docker
-make test
+# Run all tests
+./run_tests.sh
 
-# Manual testing
-./anx -c server.conf &
-curl http://localhost/
-curl -k https://localhost/
+# Test specific features
+./test_compression_demo.sh  # Test compression
+./test_logging_demo.sh      # Test logging
+./test_headers_demo.sh      # Test headers
 ```
 
-The test suite validates:
-- HTTP/HTTPS functionality
-- SSL certificate loading
-- Virtual host routing
-- Static file serving
-- Error handling
-- Configuration parsing
+## Documentation
 
-## 🛣️ Development Roadmap
+- [Configuration Guide](docs/configuration.md)
+- [API Documentation](docs/api.md)
+- [Security Guide](docs/security.md)
+- [Performance Tuning](docs/performance.md)
 
-See [ROADMAP.md](ROADMAP.md) for detailed development plans.
+## Version History
 
-### Phase 1: Core HTTP Features (Next)
-- Reverse proxy implementation (`proxy_pass`)
-- HTTP header manipulation
-- Access logging infrastructure
-- Gzip compression support
+- **v0.6.0** - Content compression support (2025-01-06)
+- **v0.5.0** - Access logging system (2025-01-05)
+- **v0.4.0** - HTTP header manipulation (2025-01-04)
+- **v0.3.0** - Reverse proxy implementation (2025-01-03)
+- **v0.2.0** - Basic HTTP/HTTPS server (2025-01-02)
+- **v0.1.0** - Initial release (2025-01-01)
 
-### Phase 2: Advanced Routing
-- Regex location matching
-- URL rewriting capabilities
-- Custom error pages
-- Directory auto-indexing
+## Contributing
 
-### Phase 3: Performance & Scalability
-- HTTP Keep-Alive connections
-- Load balancing algorithms
-- Memory pool optimization
-- Proxy caching system
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-### Long-term Goals
-- 80%+ Nginx feature compatibility
-- Production-ready performance (10K+ concurrent connections)
-- Enterprise security features
-- Plugin/module system
+## License
 
-## 🤝 Contributing
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-We welcome contributions! Key areas for development:
+## Acknowledgments
 
-1. **Core Features** - Implement reverse proxy, compression, advanced routing
-2. **Performance** - Optimize memory usage and request handling
-3. **Testing** - Expand test coverage and edge case handling
-4. **Documentation** - User guides and API documentation
-5. **Security** - Security audits and vulnerability testing
+- The Nginx project for inspiration
+- The OpenSSL team for SSL/TLS support
+- The zlib team for compression support
+- All our contributors and users
 
-### Development Guidelines
-- Follow existing C code style
-- Add tests for new features
-- Update documentation
-- Ensure memory safety
-- Maintain cross-platform compatibility
+## Contact
 
-## 📊 Comparison with Nginx
-
-| Feature | ANX v0.2.0 | Nginx | Status |
-|---------|------------|-------|--------|
-| HTTP/1.1 | ✅ | ✅ | Complete |
-| HTTPS/SSL | ✅ | ✅ | Complete |
-| Virtual Hosts | ✅ | ✅ | Complete |
-| Static Files | ✅ | ✅ | Complete |
-| Reverse Proxy | ✅ | ✅ | **NEW v0.3.0** |
-| Header Manipulation | ✅ | ✅ | **NEW v0.4.0** |
-| Load Balancing | ❌ | ✅ | Planned |
-| Compression | ❌ | ✅ | Planned |
-| HTTP/2 | ❌ | ✅ | Future |
-| Modules | ❌ | ✅ | Future |
-
-**Current Nginx Compatibility: ~20%**
-
-## 📈 Performance Benchmarks
-
-*Benchmarks coming soon - currently in development*
-
-Target performance goals:
-- **Throughput**: 50,000+ requests/second (static files)
-- **Latency**: <1ms median response time
-- **Memory**: <50MB base footprint
-- **Concurrency**: 10,000+ simultaneous connections
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🔗 Links
-
-- **Documentation**: [docs/](docs/) (coming soon)
-- **Issue Tracker**: GitHub Issues
-- **Roadmap**: [ROADMAP.md](ROADMAP.md)
-- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon)
-
----
-
-**ANX HTTP Server** - Building the next generation of high-performance web servers.
-
-*Last updated: 2025-07-05 | Version: 0.4.0* 
+- GitHub Issues: [Project Issues](https://github.com/yourusername/anx-http-server/issues)
+- Email: your.email@example.com
+- Twitter: [@ANXServer](https://twitter.com/ANXServer) 

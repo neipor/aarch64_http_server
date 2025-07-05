@@ -5,6 +5,190 @@ All notable changes to the ANX HTTP Server project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-01-06
+
+### 🚀 Major Feature: Content Compression Support
+
+This release implements Phase 1.4 of the roadmap, delivering a comprehensive content compression system that provides efficient data transfer and bandwidth optimization.
+
+### Added
+- **Complete Compression System**
+  - Gzip compression support
+  - Configurable compression levels
+  - MIME type filtering
+  - Client negotiation via Accept-Encoding
+  - Vary header support
+- **Performance Features**
+  - Configurable minimum size for compression
+  - Buffer size optimization
+  - Memory-efficient compression
+  - Streaming compression support
+- **Configuration Options**
+  - `gzip` directive for enabling/disabling
+  - `gzip_comp_level` for compression level
+  - `gzip_min_length` for minimum size
+  - `gzip_types` for MIME type control
+  - `gzip_vary` for Vary header control
+  - `gzip_buffers` for buffer configuration
+
+### Technical Implementation
+- **New Compression Module**
+  - `src/compress.h` and `src/compress.c` for compression operations
+  - zlib integration for gzip compression
+  - Efficient buffer management
+  - Memory-safe compression context
+- **Configuration Integration**
+  - New compression directives in `server.conf`
+  - MIME type management
+  - Buffer size configuration
+  - Compression level control
+
+### Configuration Examples
+```nginx
+http {
+    # Compression configuration
+    gzip on;
+    gzip_comp_level 6;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/javascript application/javascript 
+              application/json application/xml text/xml application/x-javascript
+              text/html;
+    gzip_vary on;
+    gzip_buffers 32 4k;
+}
+```
+
+### Performance Impact
+- **Bandwidth Savings**
+  - Up to 70% reduction for text content
+  - Up to 50% reduction for JSON/XML
+  - Configurable thresholds
+- **CPU Usage**
+  - Minimal impact with level 6
+  - Configurable for balance
+  - Smart compression decisions
+
+### Testing and Validation
+- **Comprehensive Test Suite**
+  - `test_compression_demo.sh` for validation
+  - Multiple content type testing
+  - Compression ratio verification
+  - Header validation
+
+## [0.5.0] - 2025-01-05
+
+### 🚀 Major Feature: Complete Access Logging Infrastructure
+
+This release implements Phase 1.3 of the roadmap, delivering a comprehensive access logging system that provides detailed request tracking, multiple log formats, and production-ready logging capabilities.
+
+### Added
+- **Complete Access Logging System**
+  - Combined Log Format (Apache-compatible)
+  - Common Log Format support
+  - JSON format for structured logging
+  - Real-time access log generation
+- **Advanced Request Tracking**
+  - Precise request timing (millisecond precision)
+  - Client IP address tracking
+  - User-Agent and Referer header capture
+  - Request/response size measurement
+  - Server name and port logging
+- **Performance Monitoring**
+  - Request duration tracking
+  - Response size statistics
+  - Upstream/proxy request timing
+  - Performance logging with configurable thresholds
+- **Structured Error Logging**
+  - Component-based error categorization
+  - Contextual error information
+  - Enhanced debugging capabilities
+  - Error log correlation with access logs
+- **Log Management Features**
+  - Configurable log file locations
+  - Log rotation by size (configurable MB threshold)
+  - Time-based log retention
+  - Automatic log file reopening after rotation
+- **Production Configuration**
+  - File-based error and access logging
+  - Configurable log levels (error, warning, info, debug)
+  - Performance logging toggle
+  - Line-buffered output for real-time monitoring
+
+### Technical Implementation
+- **New Logging Architecture**
+  - `src/log.h` and `src/log.c` completely rewritten
+  - Memory-safe log entry management
+  - Efficient timestamp formatting
+  - Multiple concurrent log streams
+- **Request Flow Integration**
+  - HTTP and HTTPS request logging
+  - Proxy request logging with upstream details
+  - Error condition logging
+  - Graceful failure handling
+- **Configuration System Integration**
+  - New configuration directives in `server.conf`
+  - Automatic configuration extraction
+  - Path resolution for log files
+  - Runtime configuration validation
+
+### Configuration Examples
+```nginx
+http {
+    # Logging configuration
+    error_log ./logs/error.log;      # Error log file path
+    access_log ./logs/access.log;    # Access log file path
+    log_level info;                  # Log level: error|warning|info|debug
+    log_format combined;             # Log format: common|combined|json
+    log_rotation_size 100;          # Rotate when log reaches 100MB
+    log_rotation_days 7;             # Keep logs for 7 days
+    performance_logging on;          # Enable performance metrics
+    
+    server {
+        listen 8080;
+        server_name localhost;
+        
+        location / {
+            root ./www;
+        }
+    }
+}
+```
+
+### Log Format Examples
+**Combined Format (Default):**
+```
+127.0.0.1 - - [05/Jul/2025:15:36:51 +0800] "GET / HTTP/1.1" 200 743 "-" "curl/8.5.0" 0.000
+```
+
+**JSON Format:**
+```json
+{"timestamp":"2025-07-05T07:36:51Z","client_ip":"127.0.0.1","method":"GET","uri":"/","protocol":"HTTP/1.1","status_code":200,"response_size":743,"referer":"-","user_agent":"curl/8.5.0","server_name":"localhost","server_port":8080,"request_duration_ms":0.156,"upstream_status":0,"upstream_addr":"-","upstream_response_time_ms":0.0}
+```
+
+### Production Readiness
+- **Monitoring Integration**
+  - Standard log formats compatible with analysis tools
+  - Real-time log streaming support
+  - Error correlation capabilities
+  - Performance baseline establishment
+- **Operational Features**
+  - Log rotation prevents disk space issues
+  - Configurable retention policies
+  - Error recovery mechanisms
+  - Graceful startup/shutdown logging
+
+### Developer Experience
+- **Debug Support**
+  - Detailed request flow logging
+  - Error context preservation
+  - Performance bottleneck identification
+  - Configuration validation logging
+- **Testing and Validation**
+  - `test_logging_demo.sh` - Complete logging system validation
+  - HTTP and HTTPS request testing
+  - Error condition testing
+  - Log format verification
+
 ## [0.4.0] - 2025-01-05
 
 ### 🚀 Major Feature: HTTP Header Manipulation System

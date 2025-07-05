@@ -5,30 +5,20 @@ CC = gcc
 # -g: Add debug info
 # -Wall: Turn on all warnings
 # -O2: Optimization level 2
-CFLAGS = -g -Wall -O2
+CFLAGS = -g -Wall -O2 -Wextra -I./src
 
 # Linker flags
-LDFLAGS = -lssl -lcrypto
+LDFLAGS = -lssl -lcrypto -lz
 
 # Source files and Object files
 # Find all .c files in the src directory
-SRCS = src/config.c \
-       src/http.c \
-       src/https.c \
-       src/log.c \
-       src/main.c \
-       src/net.c \
-       src/util.c \
-       src/core.c \
-       src/proxy.c \
-       src/headers.c
-
+SRCS = $(wildcard src/*.c)
 OBJS = $(SRCS:src/%.c=build/%.o)
 
 # Target executable
 TARGET = anx
 
-.PHONY: all clean docker-build-prod docker-run-prod docker-build-dev docker-run-dev test
+.PHONY: all clean docker-build-prod docker-run-prod docker-build-dev docker-run-dev test install uninstall check-deps help
 
 all: $(TARGET)
 
@@ -88,3 +78,38 @@ test: all
 # Target for cleaning up the project
 clean:
 	rm -f $(TARGET) build/*.o 
+
+# 安装规则
+install: $(TARGET)
+	install -m 755 $(TARGET) /usr/local/bin/
+	mkdir -p /etc/anx
+	install -m 644 server.conf /etc/anx/
+
+# 卸载规则
+uninstall:
+	rm -f /usr/local/bin/$(TARGET)
+	rm -rf /etc/anx
+
+# 检查依赖
+check-deps:
+	@echo "检查编译依赖..."
+	@which gcc > /dev/null || (echo "错误: gcc 未安装" && exit 1)
+	@ldconfig -p | grep -q libssl.so || (echo "错误: OpenSSL 开发库未安装" && exit 1)
+	@ldconfig -p | grep -q libz.so || (echo "错误: zlib 开发库未安装" && exit 1)
+
+# 帮助信息
+help:
+	@echo "ANX HTTP Server 构建系统"
+	@echo
+	@echo "可用目标:"
+	@echo "  all        - 构建服务器 (默认)"
+	@echo "  clean      - 清理构建文件"
+	@echo "  test       - 运行测试套件"
+	@echo "  install    - 安装到系统"
+	@echo "  uninstall  - 从系统卸载"
+	@echo "  check-deps - 检查编译依赖"
+	@echo
+	@echo "编译选项:"
+	@echo "  CC      = $(CC)"
+	@echo "  CFLAGS  = $(CFLAGS)"
+	@echo "  LDFLAGS = $(LDFLAGS)" 
