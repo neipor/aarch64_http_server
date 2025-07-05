@@ -1,54 +1,57 @@
-# ANX - A(sm) Nginx-like Experimental Server
+# ANX Server
 
-ANX is a lightweight, high-performance static file server designed to be both a learning project and a functional server. It started as an experiment in C and is planned to be gradually optimized with ARM assembly for maximum performance on Raspberry Pi and other ARM-based devices.
+**ANX** is a high-performance, lightweight, and modern web server written in C, designed to be a learning tool and a powerful alternative to Nginx. Originally a project to explore ARM assembly optimizations, ANX has evolved into a full-featured server with a focus on clean code, modern practices, and ease of use.
 
-## Current State
+## Features
 
-The server is currently implemented in C and supports:
-- Multi-worker architecture using `fork()`
-- Event-driven I/O with `epoll`
-- HTTP and HTTPS (with OpenSSL)
-- Static file serving
-- Configurable via `server.conf`
-- Detailed logging
+- **Nginx-Compatible Configuration**: Uses a familiar, block-based configuration syntax.
+- **HTTP/1.1 and HTTPS**: Supports both standard and encrypted connections out of the box.
+- **Multi-Process Architecture**: Leverages a master-worker model for stability and performance.
+- **High-Performance I/O**: Uses `epoll` for efficient handling of concurrent connections.
+- **Containerized**: Fully containerized with Docker for easy, reproducible builds and deployment.
+- **Modular Codebase**: Clean, well-organized source code for easy learning and contribution.
 
-## Roadmap
+## Quick Start (Docker)
 
-The future development of ANX will follow these key phases:
+The easiest way to get ANX running is with Docker.
 
-1.  **Phase 1: C Implementation (Current)**
-    - Build a robust and functional HTTP/S server in C.
-    - Implement core features like static file serving, multi-worker processing, and basic configuration.
-    - Ensure stability and correctness.
-
-2.  **Phase 2: Gradual Assembly Optimization**
-    - Identify performance-critical sections of the C code (e.g., request parsing, I/O handling).
-    - Begin rewriting these specific functions in ARM assembly language.
-    - Integrate assembly functions with the existing C codebase.
-    - The goal is to profile and optimize, not to rewrite everything at once.
-
-3.  **Phase 3: Advanced Features**
-    - Implement more advanced Nginx-like features, such as reverse proxying, load balancing, and more complex routing.
-    - The configuration for these features will aim for compatibility with Nginx's syntax where possible.
-
-## Building and Running
-
-1.  **Install dependencies** (like OpenSSL):
+1.  **Build the Docker image:**
     ```bash
-    sudo apt-get update && sudo apt-get install libssl-dev
+    make docker-build
     ```
-2.  **Generate self-signed certificates** (for HTTPS):
+
+2.  **Run the server:**
     ```bash
-    mkdir certs
-    openssl req -x509 -newkey rsa:2048 -nodes -keyout certs/server.key -out certs/server.crt -subj "/C=CN/ST=BeiJing/L=BeiJing/O=asm_http_server/OU=dev/CN=localhost"
+    make docker-run
     ```
-3.  **Compile**:
+
+    The server will be available at:
+    - **HTTP**: `http://localhost:8080`
+    - **HTTPS**: `https://localhost:8443` (You will need to accept the self-signed certificate)
+    - **HTTP (alt)**: `http://localhost:9090`
+
+## Building from Source
+
+If you prefer to build from source directly on your machine:
+
+1.  **Install dependencies:**
+    ```bash
+    # On Debian/Ubuntu
+    sudo apt-get update
+    sudo apt-get install -y build-essential libssl-dev
+    ```
+
+2.  **Compile the server:**
     ```bash
     make
     ```
-4.  **Run**:
+
+3.  **Run the server:**
+    > Note: Running without `sudo` will likely fail to bind to ports 80 and 443. You can edit `server.conf` to use higher ports (>1024).
     ```bash
     ./anx server.conf
     ```
 
-The server will then be listening on the ports defined in `server.conf`. 
+## Contributing
+
+Contributions are welcome! Please feel free to open an issue or submit a pull request. We follow a standard `develop` branch workflow. All new features should be developed in a `feature/*` branch and merged into `develop`. 

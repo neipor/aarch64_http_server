@@ -26,7 +26,7 @@ OBJS = $(SRCS:src/%.c=build/%.o)
 # Target executable
 TARGET = anx
 
-.PHONY: all clean
+.PHONY: all clean docker-build docker-run
 
 all: $(TARGET)
 
@@ -37,5 +37,13 @@ build/%.o: src/%.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+# Docker commands
+docker-build:
+	docker build -t anx-server .
+
+docker-run:
+	docker run -it -p 8080:80 -p 8443:443 -p 9090:8080 --rm anx-server
+
+# Target for cleaning up the project
 clean:
 	rm -f $(TARGET) build/*.o 
