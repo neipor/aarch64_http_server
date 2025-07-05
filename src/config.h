@@ -1,27 +1,50 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define DEFAULT_PORT 8080
-#define DEFAULT_HTTPS_PORT 8443
-#define DEFAULT_WEB_ROOT "./www"
-#define DEFAULT_PAGE "/index.html"
-#define NOT_FOUND_PAGE "/404.html"
+#include <openssl/ssl.h>
 
-// Configuration structure
-struct server_config {
-  int port;
-  int https_port;
-  char web_root[256];
-  char cert_file[256];
-  char key_file[256];
-  int num_workers;
-};
+// Represents a single "key value;" directive in nginx config
+typedef struct {
+  char *key;
+  char *value;
+} directive_t;
+
+// Represents a location /path { ... } block
+typedef struct location_block {
+  char *path;
+  directive_t *directives;
+  int directive_count;
+  struct location_block *next;
+} location_block_t;
+
+// Represents a server { ... } block
+typedef struct server_block {
+  directive_t *directives;
+  int directive_count;
+  location_block_t *locations;
+  struct server_block *next;
+} server_block_t;
+
+// Represents the main http { ... } block
+typedef struct {
+  directive_t *directives;
+  int directive_count;
+  server_block_t *servers;
+} http_block_t;
+
+// The root of our entire configuration
+typedef struct {
+  http_block_t *http;
+  // We can add other top-level blocks like 'events' here later
+} config_t;
 
 // The global server configuration, accessible by all modules.
-// The actual instance is defined in config.c
-extern struct server_config config;
+extern config_t *g_config;
 
 // Function to parse the configuration file and populate the global config struct.
-void parse_config(const char *filename);
+config_t *parse_config(const char *filename);
+
+// Function to free the memory allocated for the configuration
+void free_config(config_t *config);
 
 #endif  // CONFIG_H 

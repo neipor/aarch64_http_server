@@ -13,6 +13,8 @@
 #include "util.h"
 
 #define BUFFER_SIZE 4096
+#define TEMP_DEFAULT_PAGE "/index.html"
+#define TEMP_NOT_FOUND_PAGE "/404.html"
 
 void handle_http_request(int client_socket, const char *client_ip) {
   char buffer[BUFFER_SIZE] = {0};
@@ -52,10 +54,10 @@ void handle_http_request(int client_socket, const char *client_ip) {
 
   char file_path[BUFFER_SIZE];
   if (strcmp(req_path, "/") == 0) {
-    snprintf(file_path, sizeof(file_path), "%s%s", config.web_root,
-             DEFAULT_PAGE);
+    snprintf(file_path, sizeof(file_path), "%s%s", g_config->http->directives[1].value,
+             TEMP_DEFAULT_PAGE);
   } else {
-    snprintf(file_path, sizeof(file_path), "%s%s", config.web_root, req_path);
+    snprintf(file_path, sizeof(file_path), "%s%s", g_config->http->directives[1].value, req_path);
   }
 
   struct stat file_stat;
@@ -64,8 +66,8 @@ void handle_http_request(int client_socket, const char *client_ip) {
 
   if (stat(file_path, &file_stat) < 0 || !S_ISREG(file_stat.st_mode)) {
     status_code = 404;
-    snprintf(file_path, sizeof(file_path), "%s%s", config.web_root,
-             NOT_FOUND_PAGE);
+    snprintf(file_path, sizeof(file_path), "%s%s", g_config->http->directives[1].value,
+             TEMP_NOT_FOUND_PAGE);
     stat(file_path, &file_stat);  // Get stats for the 404 page
     snprintf(log_msg, sizeof(log_msg), "File not found: %s. Responding with 404.",
              req_path);
