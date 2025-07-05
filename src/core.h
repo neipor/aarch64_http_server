@@ -30,7 +30,7 @@ typedef struct {
 
 // Finds the best matching server and location block for a given request.
 route_t find_route(const core_config_t *core_conf, const char *host,
-                   const char *uri);
+                   const char *uri, int port);
 
 // Processes the raw, parsed config tree (g_config) and populates a core_config_t
 core_config_t *create_core_config(config_t *parsed_config);

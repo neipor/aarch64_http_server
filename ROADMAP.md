@@ -29,12 +29,12 @@ ANX is a lightweight HTTP/HTTPS server with basic Nginx-like functionality. We h
 ### Phase 1: Core HTTP Features (Weeks 1-3)
 **Goal**: Implement essential HTTP server capabilities
 
-#### 1.1 Reverse Proxy Implementation
-- [ ] **Backend connection pooling** - reuse connections to upstream servers
-- [ ] **Proxy request forwarding** - implement actual `proxy_pass` functionality
-- [ ] **Response streaming** - efficiently forward responses from backends
-- [ ] **Error handling** - proper fallback when backends are unavailable
-- [ ] **Timeout management** - configurable timeouts for backend connections
+#### 1.1 Reverse Proxy Implementation ✅ **COMPLETED v0.3.0**
+- [x] **Backend connection pooling** - reuse connections to upstream servers
+- [x] **Proxy request forwarding** - implement actual `proxy_pass` functionality
+- [x] **Response streaming** - efficiently forward responses from backends
+- [x] **Error handling** - proper fallback when backends are unavailable
+- [x] **Timeout management** - configurable timeouts for backend connections
 
 #### 1.2 HTTP Header Manipulation
 - [ ] **Request header modification** - add/remove/modify headers before forwarding

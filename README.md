@@ -101,7 +101,7 @@ http {
 - `root` - Document root directory
 - `index` - Default index files
 - `ssl_certificate` / `ssl_certificate_key` - SSL/TLS certificates
-- `proxy_pass` - Reverse proxy configuration (parsed, implementation in progress)
+- `proxy_pass` - Reverse proxy configuration (✅ **COMPLETE v0.3.0**)
 
 ## 🏗️ Architecture
 
@@ -206,13 +206,13 @@ We welcome contributions! Key areas for development:
 | HTTPS/SSL | ✅ | ✅ | Complete |
 | Virtual Hosts | ✅ | ✅ | Complete |
 | Static Files | ✅ | ✅ | Complete |
-| Reverse Proxy | 🚧 | ✅ | In Progress |
+| Reverse Proxy | ✅ | ✅ | **NEW v0.3.0** |
 | Load Balancing | ❌ | ✅ | Planned |
 | Compression | ❌ | ✅ | Planned |
 | HTTP/2 | ❌ | ✅ | Future |
 | Modules | ❌ | ✅ | Future |
 
-**Current Nginx Compatibility: ~10%**
+**Current Nginx Compatibility: ~15%**
 
 ## 📈 Performance Benchmarks
 
@@ -239,4 +239,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 **ANX HTTP Server** - Building the next generation of high-performance web servers.
 
-*Last updated: 2025-01-05 | Version: 0.2.0* 
+*Last updated: 2025-07-05 | Version: 0.3.0* 

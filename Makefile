@@ -19,7 +19,8 @@ SRCS = src/config.c \
        src/main.c \
        src/net.c \
        src/util.c \
-       src/core.c
+       src/core.c \
+       src/proxy.c
 
 OBJS = $(SRCS:src/%.c=build/%.o)
 

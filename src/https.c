@@ -14,6 +14,7 @@
 #include "core.h"
 #include "log.h"
 #include "util.h"
+#include "proxy.h"
 
 #define BUFFER_SIZE 4096
 #define TEMP_DEFAULT_PAGE "/index.html"
@@ -30,6 +31,18 @@ static char *get_host(const char *buffer) {
     if (!host_end) return NULL;
 
     return strndup(host_start, host_end - host_start);
+}
+
+// 从SSL缓冲区提取HTTP头部信息
+static char *extract_ssl_headers(const char *buffer) {
+    const char *headers_start = strchr(buffer, '\n');
+    if (!headers_start) return NULL;
+    
+    headers_start++; // 跳过第一行
+    const char *headers_end = strstr(headers_start, "\r\n\r\n");
+    if (!headers_end) return NULL;
+    
+    return strndup(headers_start, headers_end - headers_start);
 }
 
 void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_conf) {
@@ -60,11 +73,45 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
   log_message(LOG_LEVEL_INFO, log_msg);
 
   // --- Routing ---
-  route_t route = find_route(core_conf, host, req_path);
+  route_t route = find_route(core_conf, host, req_path, 8443);
   if (!route.server) {
       log_message(LOG_LEVEL_ERROR, "Could not find a server block for the request.");
       const char *response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
       SSL_write(ssl, response, strlen(response));
+      free(host);
+      free(buffer_copy);
+      return;
+  }
+
+  // 检查是否有proxy_pass指令
+  const char *proxy_pass = NULL;
+  if (route.location) {
+      proxy_pass = get_directive_value("proxy_pass", route.location->directives, route.location->directive_count);
+  }
+
+  // 如果配置了proxy_pass，执行反向代理
+  if (proxy_pass) {
+      char *headers = extract_ssl_headers(buffer);
+      int result = handle_https_proxy_request(ssl, method, req_path, http_version, 
+                                            headers, proxy_pass, client_ip);
+      
+      if (result < 0) {
+          // 代理失败，返回502错误
+          const char *response = "HTTP/1.1 502 Bad Gateway\r\n"
+                                "Content-Type: text/plain\r\n"
+                                "Content-Length: 15\r\n"
+                                "Connection: close\r\n\r\n"
+                                "Bad Gateway";
+          SSL_write(ssl, response, strlen(response));
+          
+          snprintf(log_msg, sizeof(log_msg), "HTTPS proxy request failed for %s", req_path);
+          log_message(LOG_LEVEL_ERROR, log_msg);
+      } else {
+          snprintf(log_msg, sizeof(log_msg), "HTTPS proxy request completed for %s", req_path);
+          log_message(LOG_LEVEL_INFO, log_msg);
+      }
+      
+      free(headers);
       free(host);
       free(buffer_copy);
       return;

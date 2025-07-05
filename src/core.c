@@ -2,52 +2,99 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "config.h"
 #include "log.h"
 #include "net.h"
 
 route_t find_route(const core_config_t *core_conf, const char *host,
-                   const char *uri) {
+                   const char *uri, int port) {
   route_t route = {NULL, NULL};
   if (!core_conf || !core_conf->raw_config || !core_conf->raw_config->http || !core_conf->raw_config->http->servers) {
     return route;
   }
 
-  // 1. Find the matching server block
+  // 1. Find the matching server block by host AND port
   server_block_t *matched_server = NULL;
-  // First server is default
-  server_block_t *default_server = core_conf->raw_config->http->servers; 
-
+  server_block_t *default_server = NULL;
+  
   for (server_block_t *srv = core_conf->raw_config->http->servers; srv; srv = srv->next) {
-    const char *server_name = get_directive_value("server_name", srv->directives, srv->directive_count);
-    if (host && server_name && strcmp(host, server_name) == 0) {
-      matched_server = srv;
-      break;
+    // Check if this server listens on the requested port
+    bool listens_on_port = false;
+    for (int i = 0; i < srv->directive_count; i++) {
+      if (strcmp(srv->directives[i].key, "listen") == 0) {
+        char *value_copy = strdup(srv->directives[i].value);
+        char *token = strtok(value_copy, " ");
+        int listen_port = token ? atoi(token) : 0;
+        
+        if (listen_port == port) {
+          listens_on_port = true;
+          if (!default_server) {
+            default_server = srv; // First server listening on this port is default
+          }
+        }
+        free(value_copy);
+      }
+    }
+    
+    if (listens_on_port) {
+      const char *server_name = get_directive_value("server_name", srv->directives, srv->directive_count);
+      if (host && server_name && strcmp(host, server_name) == 0) {
+        matched_server = srv;
+        break;
+      }
     }
   }
 
   if (!matched_server) {
     matched_server = default_server;
   }
+  
+  if (!matched_server) {
+    // Fallback to the very first server if no port matches
+    matched_server = core_conf->raw_config->http->servers;
+  }
+  
   route.server = matched_server;
-
 
   // 2. Find the best matching location block within that server
   if (matched_server) {
     location_block_t *best_match = NULL;
     size_t best_match_len = 0;
 
+    // Debug: log the available locations
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "DEBUG: Looking for location match for URI: %s on port %d", uri, port);
+    log_message(LOG_LEVEL_DEBUG, log_msg);
+
     for (location_block_t *loc = matched_server->locations; loc; loc = loc->next) {
       size_t loc_path_len = strlen(loc->path);
+      snprintf(log_msg, sizeof(log_msg), "DEBUG: Checking location: %s (len=%zu)", loc->path, loc_path_len);
+      log_message(LOG_LEVEL_DEBUG, log_msg);
+      
       if (strncmp(uri, loc->path, loc_path_len) == 0) {
         // It's a prefix match. Is it the best one so far?
+        snprintf(log_msg, sizeof(log_msg), "DEBUG: Location %s matches URI %s", loc->path, uri);
+        log_message(LOG_LEVEL_DEBUG, log_msg);
+        
         if (loc_path_len > best_match_len) {
           best_match = loc;
           best_match_len = loc_path_len;
+          snprintf(log_msg, sizeof(log_msg), "DEBUG: New best match: %s (len=%zu)", loc->path, loc_path_len);
+          log_message(LOG_LEVEL_DEBUG, log_msg);
         }
       }
     }
+    
+    if (best_match) {
+      snprintf(log_msg, sizeof(log_msg), "DEBUG: Final location match: %s", best_match->path);
+      log_message(LOG_LEVEL_DEBUG, log_msg);
+    } else {
+      snprintf(log_msg, sizeof(log_msg), "DEBUG: No location matched for URI: %s", uri);
+      log_message(LOG_LEVEL_DEBUG, log_msg);
+    }
+    
     route.location = best_match;
   }
 

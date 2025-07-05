@@ -198,4 +198,90 @@ This release involved extensive debugging and problem-solving:
 ---
 
 *For detailed technical information, see [ROADMAP.md](ROADMAP.md)*
-*For contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md)* 
+*For contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md)*
+
+## [v0.3.0] - 2025-07-05
+
+### 🚀 Major Features Added
+- **Reverse Proxy Implementation**
+  - Full `proxy_pass` directive support
+  - HTTP and HTTPS proxy functionality
+  - Automatic request/response forwarding
+  - Backend connection pooling
+  - Error handling with 502 Bad Gateway responses
+  - X-Forwarded-For and X-Forwarded-Proto headers
+  - Configurable backend timeouts (30 seconds)
+
+### 🔧 Enhancements
+- **Improved Routing System**
+  - Port-aware server block selection
+  - Fixed location matching logic
+  - Better debugging output for route resolution
+  - Proper precedence handling for location blocks
+
+### 🐛 Bug Fixes
+- Fixed server block selection based on listening ports
+- Corrected location matching for complex routing scenarios
+- Improved error handling for missing backend servers
+
+### 📊 Technical Details
+- Added `src/proxy.c` and `src/proxy.h` for reverse proxy functionality
+- Enhanced `find_route()` function with port parameter
+- Implemented URL parsing for backend destinations
+- Added proper resource cleanup and memory management
+
+### 🧪 Testing
+- Comprehensive reverse proxy testing
+- Multi-backend server validation
+- HTTP and HTTPS proxy verification
+- Error condition testing
+
+### 📝 Configuration Examples
+```nginx
+server {
+    listen 8080;
+    server_name localhost;
+    
+    # Static files
+    location / {
+        root ./www;
+    }
+    
+    # API proxy
+    location /api {
+        proxy_pass http://127.0.0.1:3000;
+    }
+    
+    # Admin interface proxy
+    location /admin {
+        proxy_pass http://127.0.0.1:3001;
+    }
+}
+
+server {
+    listen 8443 ssl;
+    server_name localhost;
+    ssl_certificate ./certs/server.crt;
+    ssl_certificate_key ./certs/server.key;
+    
+    # Microservice proxy
+    location /service {
+        proxy_pass http://127.0.0.1:3002;
+    }
+}
+```
+
+### 🎯 Roadmap Progress
+- ✅ **Phase 1.1**: Reverse Proxy Implementation
+  - ✅ Backend connection pooling
+  - ✅ Proxy request forwarding
+  - ✅ Response streaming
+  - ✅ Error handling
+  - ✅ Timeout management
+
+**Next**: Phase 1.2 - HTTP Header Manipulation
+
+## [v0.2.0] - 2025-07-03
+
+### ✨ New Features
+- **Multi-protocol Support** 
