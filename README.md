@@ -1,57 +1,242 @@
-# ANX Server
+# ANX HTTP Server
 
-**ANX** is a high-performance, lightweight, and modern web server written in C, designed to be a learning tool and a powerful alternative to Nginx. Originally a project to explore ARM assembly optimizations, ANX has evolved into a full-featured server with a focus on clean code, modern practices, and ease of use.
+A high-performance, Nginx-inspired HTTP/HTTPS server written in C, designed to be lightweight, secure, and production-ready.
 
-## Features
+## 🚀 Current Status (v0.2.0)
 
-- **Nginx-Compatible Configuration**: Uses a familiar, block-based configuration syntax.
-- **HTTP/1.1 and HTTPS**: Supports both standard and encrypted connections out of the box.
-- **Multi-Process Architecture**: Leverages a master-worker model for stability and performance.
-- **High-Performance I/O**: Uses `epoll` for efficient handling of concurrent connections.
-- **Containerized**: Fully containerized with Docker for easy, reproducible builds and deployment.
-- **Modular Codebase**: Clean, well-organized source code for easy learning and contribution.
+ANX successfully implements core HTTP server functionality with modern architecture:
 
-## Quick Start (Docker)
+### ✅ Working Features
+- **HTTP/1.1 and HTTPS** support with SSL/TLS encryption
+- **Multi-process architecture** (master + worker processes)
+- **Virtual hosts** with `server_name` directive support
+- **Location-based routing** for flexible request handling
+- **Static file serving** with automatic MIME type detection
+- **Nginx-style configuration** syntax (`http {}`, `server {}`, `location {}`)
+- **Epoll-based event handling** for high concurrency
+- **"Green" deployment** - portable with configurable paths
+- **Docker containerization** for development and testing
+- **Automated testing** with comprehensive test suite
 
-The easiest way to get ANX running is with Docker.
+### 🎯 Performance
+- **Multi-process concurrent handling** using epoll
+- **Non-blocking I/O** for optimal performance
+- **SSL/TLS optimization** with proper certificate handling
+- **Memory-safe** implementation with proper resource cleanup
 
-1.  **Build the Docker image:**
-    ```bash
-    make docker-build
-    ```
+## 📋 Quick Start
 
-2.  **Run the server:**
-    ```bash
-    make docker-run
-    ```
+### Prerequisites
+- GCC compiler
+- OpenSSL development libraries
+- Make build system
+- Docker (optional, for containerized development)
 
-    The server will be available at:
-    - **HTTP**: `http://localhost:8080`
-    - **HTTPS**: `https://localhost:8443` (You will need to accept the self-signed certificate)
-    - **HTTP (alt)**: `http://localhost:9090`
+### Build and Run
+```bash
+# Clone the repository
+git clone <repository-url>
+cd asm_http_server
 
-## Building from Source
+# Build the server
+make clean && make
 
-If you prefer to build from source directly on your machine:
+# Run with default configuration
+./anx
 
-1.  **Install dependencies:**
-    ```bash
-    # On Debian/Ubuntu
-    sudo apt-get update
-    sudo apt-get install -y build-essential libssl-dev
-    ```
+# Run with custom configuration
+./anx -c /path/to/your/config.conf
 
-2.  **Compile the server:**
-    ```bash
-    make
-    ```
+# Run automated tests
+make test
+```
 
-3.  **Run the server:**
-    > Note: Running without `sudo` will likely fail to bind to ports 80 and 443. You can edit `server.conf` to use higher ports (>1024).
-    ```bash
-    ./anx server.conf
-    ```
+### Docker Development
+```bash
+# Build development environment
+make docker-build-dev
 
-## Contributing
+# Run in container
+make docker-run-dev
+```
 
-Contributions are welcome! Please feel free to open an issue or submit a pull request. We follow a standard `develop` branch workflow. All new features should be developed in a `feature/*` branch and merged into `develop`. 
+## ⚙️ Configuration
+
+ANX uses Nginx-compatible configuration syntax:
+
+```nginx
+http {
+    workers 2;
+    
+    server {
+        listen 80;
+        server_name localhost;
+        root www;
+        index index.html;
+    }
+    
+    server {
+        listen 443 ssl;
+        server_name localhost;
+        root www;
+        index index.html;
+        ssl_certificate certs/server.crt;
+        ssl_certificate_key certs/server.key;
+        
+        location /api {
+            proxy_pass http://127.0.0.1:3000;
+        }
+        
+        location /static {
+            index index.html;
+        }
+    }
+}
+```
+
+### Supported Directives
+- `workers` - Number of worker processes
+- `listen` - Port and protocol (HTTP/HTTPS)
+- `server_name` - Virtual host matching
+- `root` - Document root directory
+- `index` - Default index files
+- `ssl_certificate` / `ssl_certificate_key` - SSL/TLS certificates
+- `proxy_pass` - Reverse proxy configuration (parsed, implementation in progress)
+
+## 🏗️ Architecture
+
+### Process Model
+```
+Master Process
+├── Worker Process 1 (epoll event loop)
+├── Worker Process 2 (epoll event loop)
+└── Worker Process N (epoll event loop)
+```
+
+### Request Flow
+1. **Connection Accept** - Worker accepts client connection
+2. **SSL Handshake** - Performs SSL negotiation (if HTTPS)
+3. **Request Parsing** - Parses HTTP request headers
+4. **Routing** - Matches request to server/location blocks
+5. **Response Generation** - Serves static files or proxies to backend
+6. **Connection Cleanup** - Properly closes connection and frees resources
+
+### Module Structure
+- `src/main.c` - Master process and worker management
+- `src/config.c` - Configuration file parsing
+- `src/core.c` - Core configuration processing and routing
+- `src/net.c` - Network handling and event loops
+- `src/http.c` - HTTP request/response handling
+- `src/https.c` - HTTPS/SSL request handling
+- `src/log.c` - Logging infrastructure
+- `src/util.c` - Utility functions (MIME types, etc.)
+
+## 🧪 Testing
+
+ANX includes comprehensive automated testing:
+
+```bash
+# Run all tests with Docker
+make test
+
+# Manual testing
+./anx -c server.conf &
+curl http://localhost/
+curl -k https://localhost/
+```
+
+The test suite validates:
+- HTTP/HTTPS functionality
+- SSL certificate loading
+- Virtual host routing
+- Static file serving
+- Error handling
+- Configuration parsing
+
+## 🛣️ Development Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for detailed development plans.
+
+### Phase 1: Core HTTP Features (Next)
+- Reverse proxy implementation (`proxy_pass`)
+- HTTP header manipulation
+- Access logging infrastructure
+- Gzip compression support
+
+### Phase 2: Advanced Routing
+- Regex location matching
+- URL rewriting capabilities
+- Custom error pages
+- Directory auto-indexing
+
+### Phase 3: Performance & Scalability
+- HTTP Keep-Alive connections
+- Load balancing algorithms
+- Memory pool optimization
+- Proxy caching system
+
+### Long-term Goals
+- 80%+ Nginx feature compatibility
+- Production-ready performance (10K+ concurrent connections)
+- Enterprise security features
+- Plugin/module system
+
+## 🤝 Contributing
+
+We welcome contributions! Key areas for development:
+
+1. **Core Features** - Implement reverse proxy, compression, advanced routing
+2. **Performance** - Optimize memory usage and request handling
+3. **Testing** - Expand test coverage and edge case handling
+4. **Documentation** - User guides and API documentation
+5. **Security** - Security audits and vulnerability testing
+
+### Development Guidelines
+- Follow existing C code style
+- Add tests for new features
+- Update documentation
+- Ensure memory safety
+- Maintain cross-platform compatibility
+
+## 📊 Comparison with Nginx
+
+| Feature | ANX v0.2.0 | Nginx | Status |
+|---------|------------|-------|--------|
+| HTTP/1.1 | ✅ | ✅ | Complete |
+| HTTPS/SSL | ✅ | ✅ | Complete |
+| Virtual Hosts | ✅ | ✅ | Complete |
+| Static Files | ✅ | ✅ | Complete |
+| Reverse Proxy | 🚧 | ✅ | In Progress |
+| Load Balancing | ❌ | ✅ | Planned |
+| Compression | ❌ | ✅ | Planned |
+| HTTP/2 | ❌ | ✅ | Future |
+| Modules | ❌ | ✅ | Future |
+
+**Current Nginx Compatibility: ~10%**
+
+## 📈 Performance Benchmarks
+
+*Benchmarks coming soon - currently in development*
+
+Target performance goals:
+- **Throughput**: 50,000+ requests/second (static files)
+- **Latency**: <1ms median response time
+- **Memory**: <50MB base footprint
+- **Concurrency**: 10,000+ simultaneous connections
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🔗 Links
+
+- **Documentation**: [docs/](docs/) (coming soon)
+- **Issue Tracker**: GitHub Issues
+- **Roadmap**: [ROADMAP.md](ROADMAP.md)
+- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon)
+
+---
+
+**ANX HTTP Server** - Building the next generation of high-performance web servers.
+
+*Last updated: 2025-01-05 | Version: 0.2.0* 

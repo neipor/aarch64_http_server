@@ -6,8 +6,32 @@
 #include <stdlib.h>
 #include <string.h>
 
-// The global config structure instance.
-config_t *g_config = NULL;
+// Global variable to store the directory of the config file
+static char config_dir[256] = {0};
+
+// Helper function to resolve relative paths
+char* resolve_config_path(const char* path) {
+    if (path == NULL) return NULL;
+    
+    // If path is already absolute, return a copy
+    if (path[0] == '/') {
+        char* result = malloc(strlen(path) + 1);
+        strcpy(result, path);
+        return result;
+    }
+    
+    // If config_dir is not set, use current directory
+    if (config_dir[0] == '\0') {
+        char* result = malloc(strlen(path) + 1);
+        strcpy(result, path);
+        return result;
+    }
+    
+    // Combine config_dir with relative path
+    char* result = malloc(strlen(config_dir) + strlen(path) + 2);
+    sprintf(result, "%s/%s", config_dir, path);
+    return result;
+}
 
 const char *get_directive_value(const char *key, const directive_t *directives,
                                 int count) {
@@ -233,81 +257,92 @@ static http_block_t *parse_http_block(int *token_idx) {
 // --- Public API ---
 
 config_t *parse_config(const char *filename) {
-  FILE *file = fopen(filename, "r");
-  if (!file) {
-    char msg[256];
-    snprintf(msg, sizeof(msg), "Config file '%s' not found.", filename);
-    log_message(LOG_LEVEL_ERROR, msg);
-    return NULL;
-  }
-
-  fseek(file, 0, SEEK_END);
-  long length = ftell(file);
-  fseek(file, 0, SEEK_SET);
-
-  char *content = malloc(length + 1);
-  if (!content) {
-    log_message(LOG_LEVEL_ERROR, "Could not allocate memory for config file.");
-    fclose(file);
-    return NULL;
-  }
-  fread(content, 1, length, file);
-  content[length] = '\0';
-  fclose(file);
-
-  tokenize(content);
-  free(content);
-
-  config_t *new_config = calloc(1, sizeof(config_t));
-  int token_idx = 0;
-  while (token_idx < token_count) {
-    if (strcmp(tokens[token_idx], "http") == 0) {
-      new_config->http = parse_http_block(&token_idx);
+    // Extract directory from filename
+    const char* last_slash = strrchr(filename, '/');
+    if (last_slash) {
+        size_t dir_len = last_slash - filename;
+        strncpy(config_dir, filename, dir_len);
+        config_dir[dir_len] = '\0';
     } else {
-      // Skip unknown top-level blocks for now
-      log_message(LOG_LEVEL_DEBUG, "Skipping unknown top-level block");
-      token_idx++;
+        // No directory in filename, use current directory
+        config_dir[0] = '\0';
     }
-  }
+    
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Config file '%s' not found.", filename);
+        log_message(LOG_LEVEL_ERROR, msg);
+        return NULL;
+    }
 
-  // Debug print the parsed directives
-  if (new_config->http) {
-    log_message(LOG_LEVEL_DEBUG, "--- Parsed Configuration ---");
-    for (int i = 0; i < new_config->http->directive_count; i++) {
-      printf("http > %s: %s\n", new_config->http->directives[i].key,
-             new_config->http->directives[i].value);
+    fseek(file, 0, SEEK_END);
+    long length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    char *content = malloc(length + 1);
+    if (!content) {
+        log_message(LOG_LEVEL_ERROR, "Could not allocate memory for config file.");
+        fclose(file);
+        return NULL;
     }
-    server_block_t *srv = new_config->http->servers;
-    int server_num = 0;
-    while (srv) {
-      printf("http > server #%d:\n", server_num++);
-      for (int i = 0; i < srv->directive_count; i++) {
-        // Note: some values can be multipart, like 'listen 443 ssl'
-        // Our simple key/value directive parser won't handle that correctly yet.
-        if (srv->directives[i].key && srv->directives[i].value) {
-            printf("  %s: %s\n", srv->directives[i].key,
-                   srv->directives[i].value);
+    fread(content, 1, length, file);
+    content[length] = '\0';
+    fclose(file);
+
+    tokenize(content);
+    free(content);
+
+    config_t *new_config = calloc(1, sizeof(config_t));
+    int token_idx = 0;
+    while (token_idx < token_count) {
+        if (strcmp(tokens[token_idx], "http") == 0) {
+            new_config->http = parse_http_block(&token_idx);
+        } else {
+            // Skip unknown top-level blocks for now
+            log_message(LOG_LEVEL_DEBUG, "Skipping unknown top-level block");
+            token_idx++;
         }
-      }
-      location_block_t *loc = srv->locations;
-      while(loc) {
-          printf("  location %s:\n", loc->path);
-          for (int i = 0; i < loc->directive_count; i++) {
-              if(loc->directives[i].key && loc->directives[i].value) {
-                  printf("    %s: %s\n", loc->directives[i].key, loc->directives[i].value);
-              }
-          }
-          loc = loc->next;
-      }
-      srv = srv->next;
     }
-    printf("--- End Parsed Configuration ---\n");
-  }
 
-  // Cleanup tokens after use
-  free_tokens();
+    // Debug print the parsed directives
+    if (new_config->http) {
+        log_message(LOG_LEVEL_DEBUG, "--- Parsed Configuration ---");
+        for (int i = 0; i < new_config->http->directive_count; i++) {
+            printf("http > %s: %s\n", new_config->http->directives[i].key,
+                   new_config->http->directives[i].value);
+        }
+        server_block_t *srv = new_config->http->servers;
+        int server_num = 0;
+        while (srv) {
+            printf("http > server #%d:\n", server_num++);
+            for (int i = 0; i < srv->directive_count; i++) {
+                // Note: some values can be multipart, like 'listen 443 ssl'
+                // Our simple key/value directive parser won't handle that correctly yet.
+                if (srv->directives[i].key && srv->directives[i].value) {
+                    printf("  %s: %s\n", srv->directives[i].key,
+                           srv->directives[i].value);
+                }
+            }
+            location_block_t *loc = srv->locations;
+            while(loc) {
+                printf("  location %s:\n", loc->path);
+                for (int i = 0; i < loc->directive_count; i++) {
+                    if(loc->directives[i].key && loc->directives[i].value) {
+                        printf("    %s: %s\n", loc->directives[i].key, loc->directives[i].value);
+                    }
+                }
+                loc = loc->next;
+            }
+            srv = srv->next;
+        }
+        printf("--- End Parsed Configuration ---\n");
+    }
 
-  return new_config;
+    // Cleanup tokens after use
+    free_tokens();
+
+    return new_config;
 }
 
 static void free_directive(directive_t *dir) {

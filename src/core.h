@@ -17,6 +17,8 @@ typedef struct {
   int worker_processes;
   listening_socket_t *listening_sockets;
   int listening_socket_count;
+  // A pointer back to the raw parsed config tree
+  config_t *raw_config;
   // We can add pointers to processed virtual host configs here later
 } core_config_t;
 

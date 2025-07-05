@@ -10,6 +10,7 @@
 #include "core.h"
 #include "log.h"
 #include "net.h"
+#include "https.h"
 
 pid_t worker_pids[128];
 int num_workers_spawned = 0;
@@ -26,23 +27,33 @@ void signal_handler(int signum) {
 }
 
 int main(int argc, char *argv[]) {
-    const char *config_file = "server.conf";
-    if (argc > 1) {
-        config_file = argv[1];
+    log_init("anx.log", LOG_LEVEL_DEBUG);
+
+    char *config_file = "server.conf"; // Default config path
+    int opt;
+
+    while ((opt = getopt(argc, argv, "c:")) != -1) {
+        switch (opt) {
+            case 'c':
+                config_file = optarg;
+                break;
+            default: /* '?' */
+                fprintf(stderr, "Usage: %s [-c config_file]\n", argv[0]);
+                exit(EXIT_FAILURE);
+        }
     }
 
-    // 1. Parse config file into a syntax tree
-    g_config = parse_config(config_file);
-    if (!g_config) {
-        log_message(LOG_LEVEL_ERROR, "Failed to parse configuration. Exiting.");
-        return EXIT_FAILURE;
+    config_t *config = parse_config(config_file);
+    if (config == NULL) {
+        fprintf(stderr, "Failed to parse configuration from %s\n", config_file);
+        return 1;
     }
 
     // 2. Process the syntax tree into a usable core configuration
-    core_config_t *core_conf = create_core_config(g_config);
+    core_config_t *core_conf = create_core_config(config);
     if (!core_conf) {
         log_message(LOG_LEVEL_ERROR, "Failed to process configuration. Exiting.");
-        free_config(g_config);
+        free_config(config);
         return EXIT_FAILURE;
     }
     
@@ -65,11 +76,11 @@ int main(int argc, char *argv[]) {
                 continue;
             }
             
-            // Use our real certs now
-            if (strcmp(cert_file, "/etc/anx/certs/cert.pem")==0) {
-                cert_file = "certs/server.crt";
-                key_file = "certs/server.key";
-            }
+            char log_buf[512];
+            snprintf(log_buf, sizeof(log_buf), "Attempting to load SSL cert from: %s", cert_file);
+            log_message(LOG_LEVEL_DEBUG, log_buf);
+            snprintf(log_buf, sizeof(log_buf), "Attempting to load SSL key from: %s", key_file);
+            log_message(LOG_LEVEL_DEBUG, log_buf);
 
             ssl_ctx = SSL_CTX_new(TLS_server_method());
             if (!ssl_ctx) {
@@ -149,7 +160,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-            worker_loop(worker_http_fd, worker_https_fd, ssl_ctx);
+            worker_loop(worker_http_fd, worker_https_fd, core_conf, ssl_ctx);
             exit(0);
         } else {
             worker_pids[i] = pid;
@@ -172,7 +183,6 @@ int main(int argc, char *argv[]) {
 
     if (ssl_ctx) SSL_CTX_free(ssl_ctx);
     free_core_config(core_conf);
-    free_config(g_config);
 
     log_message(LOG_LEVEL_DEBUG, "--> main: END");
     return 0;

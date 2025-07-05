@@ -30,7 +30,7 @@ static char *get_host(const char *buffer) {
     return strndup(host_start, host_end - host_start);
 }
 
-void handle_http_request(int client_socket, const char *client_ip) {
+void handle_http_request(int client_socket, const char *client_ip, core_config_t *core_conf) {
   char buffer[BUFFER_SIZE];
   ssize_t bytes_read = read(client_socket, buffer, sizeof(buffer) - 1);
 
@@ -67,7 +67,7 @@ void handle_http_request(int client_socket, const char *client_ip) {
   }
 
   // --- Routing ---
-  route_t route = find_route(NULL, host, req_path); // core_conf is not needed yet
+  route_t route = find_route(core_conf, host, req_path);
   if (!route.server) {
       // Send a 500 internal server error
       const char *response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
@@ -113,6 +113,15 @@ void handle_http_request(int client_socket, const char *client_ip) {
   file_fd = open(file_path, O_RDONLY);
   if (file_fd < 0) {
     log_message(LOG_LEVEL_ERROR, "Could not open requested file.");
+    // Send a 500 error response instead of just closing
+    const char *response = "HTTP/1.1 500 Internal Server Error\r\n"
+                          "Content-Type: text/plain\r\n"
+                          "Content-Length: 21\r\n"
+                          "Connection: close\r\n\r\n"
+                          "Internal Server Error";
+    write(client_socket, response, strlen(response));
+    free(host);
+    free(buffer_copy);
     close(client_socket);
     return;
   }

@@ -38,9 +38,6 @@ typedef struct {
   // We can add other top-level blocks like 'events' here later
 } config_t;
 
-// The global server configuration, accessible by all modules.
-extern config_t *g_config;
-
 // Helper function to find the value of a directive within an array.
 const char *get_directive_value(const char *key, const directive_t *directives, int count);
 
@@ -49,5 +46,8 @@ config_t *parse_config(const char *filename);
 
 // Function to free the memory allocated for the configuration
 void free_config(config_t *config);
+
+// Helper function to resolve relative paths based on config file location
+char* resolve_config_path(const char* path);
 
 #endif  // CONFIG_H 

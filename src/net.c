@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "core.h"
 #include "http.h"
 #include "https.h"
 #include "log.h"
@@ -79,7 +80,7 @@ int create_server_socket(int port) {
 }
 
 
-void worker_loop(int server_fd, int https_server_fd, SSL_CTX *ssl_ctx) {
+void worker_loop(int server_fd, int https_server_fd, core_config_t *core_config, SSL_CTX *ssl_ctx) {
   int epoll_fd;
   struct epoll_event event;
 
@@ -143,9 +144,23 @@ void worker_loop(int server_fd, int https_server_fd, SSL_CTX *ssl_ctx) {
         if (is_https) {
           SSL *ssl = SSL_new(ssl_ctx);
           SSL_set_fd(ssl, client_fd);
-          handle_https_request(ssl, client_ip);
+          
+          // Perform SSL handshake
+          if (SSL_accept(ssl) <= 0) {
+            char log_msg[256];
+            snprintf(log_msg, sizeof(log_msg), "SSL handshake failed for client %s", client_ip);
+            log_message(LOG_LEVEL_ERROR, log_msg);
+            SSL_free(ssl);
+            close(client_fd);
+            continue;
+          }
+          
+          handle_https_request(ssl, client_ip, core_config);
+          SSL_shutdown(ssl);
+          SSL_free(ssl);
+          close(client_fd);
         } else {
-          handle_http_request(client_fd, client_ip);
+          handle_http_request(client_fd, client_ip, core_config);
         }
       }
     }

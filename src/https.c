@@ -32,7 +32,7 @@ static char *get_host(const char *buffer) {
     return strndup(host_start, host_end - host_start);
 }
 
-void handle_https_request(SSL *ssl, const char *client_ip) {
+void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_conf) {
   char buffer[BUFFER_SIZE];
   int bytes_read = SSL_read(ssl, buffer, sizeof(buffer) - 1);
 
@@ -60,7 +60,7 @@ void handle_https_request(SSL *ssl, const char *client_ip) {
   log_message(LOG_LEVEL_INFO, log_msg);
 
   // --- Routing ---
-  route_t route = find_route(NULL, host, req_path);
+  route_t route = find_route(core_conf, host, req_path);
   if (!route.server) {
       log_message(LOG_LEVEL_ERROR, "Could not find a server block for the request.");
       const char *response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
@@ -117,6 +117,11 @@ void handle_https_request(SSL *ssl, const char *client_ip) {
         SSL_write(ssl, file_buffer, bytes);
     }
     close(file_fd);
+  } else {
+    log_message(LOG_LEVEL_ERROR, "Could not open requested file for HTTPS.");
+    // Send error response body
+    const char *error_body = "Internal Server Error";
+    SSL_write(ssl, error_body, strlen(error_body));
   }
 
   free(host);

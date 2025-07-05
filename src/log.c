@@ -1,7 +1,23 @@
 #include "log.h"
+#include <time.h>
+#include <unistd.h>
+
+static log_level_t current_log_level = LOG_LEVEL_INFO;
+
+// Function to initialize the logger
+void log_init(const char *filename, log_level_t level) {
+    current_log_level = level;
+    // For now, we just set the log level. 
+    // In the future, we could redirect output to a file here.
+}
 
 // Centralized logging function
 void log_message(log_level_t level, const char *message) {
+  // Only log if the message level is at or above the current log level
+  if (level > current_log_level) {
+    return;
+  }
+
   time_t now = time(NULL);
   char time_buf[sizeof("2024-01-01 12:00:00")];
   strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", localtime(&now));
