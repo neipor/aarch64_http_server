@@ -1,8 +1,84 @@
 # Build artifacts
 /build/
+*.o
+*.a
+*.so
+*.dylib
 
-# Executable file
+# Executable files
 /anx
- 
+anx
+anx.exe
+
+# SSL Certificates and Keys (自签证书)
+*.crt
+*.key
+*.pem
+*.p12
+*.pfx
+/certs/*.crt
+/certs/*.key
+/certs/*.pem
+
 # Configuration files that might contain secrets
-/config/*.local 
+/config/*.local
+*.local.conf
+*.secret
+
+# Log files
+*.log
+logs/
+/logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Core dumps
+core
+core.*
+
+# Test files and temporary test scripts
+test_*
+temp_*
+*.test
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-*
+.clangd/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Package files
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+
+# Docker volumes and data
+docker-data/
+volumes/
+
+# Development database files
+*.db
+*.sqlite
+*.sqlite3 
