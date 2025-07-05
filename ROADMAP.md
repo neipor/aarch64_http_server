@@ -17,10 +17,11 @@ ANX is a lightweight HTTP/HTTPS server with basic Nginx-like functionality. We h
 - **Automated testing** with timeout protection
 
 ### 📊 Current Metrics
-- **~2,000 lines of C code**
-- **~5-10% of Nginx functionality**
+- **~2,500 lines of C code**
+- **~20% of Nginx functionality**
 - **Production-ready foundation** with proper error handling
 - **Memory-safe** with proper cleanup and resource management
+- **Complete reverse proxy** with header manipulation
 
 ---
 
@@ -36,11 +37,11 @@ ANX is a lightweight HTTP/HTTPS server with basic Nginx-like functionality. We h
 - [x] **Error handling** - proper fallback when backends are unavailable
 - [x] **Timeout management** - configurable timeouts for backend connections
 
-#### 1.2 HTTP Header Manipulation
-- [ ] **Request header modification** - add/remove/modify headers before forwarding
-- [ ] **Response header modification** - modify headers from backends
-- [ ] **Standard headers** - automatically add Server, Date, Content-Length
-- [ ] **Security headers** - optional HSTS, X-Frame-Options, etc.
+#### 1.2 HTTP Header Manipulation ✅ **COMPLETED v0.4.0**
+- [x] **Request header modification** - add/remove/modify headers before forwarding
+- [x] **Response header modification** - modify headers from backends
+- [x] **Standard headers** - automatically add Server, Date, Content-Length
+- [x] **Security headers** - optional HSTS, X-Frame-Options, etc.
 
 #### 1.3 Logging Infrastructure
 - [ ] **Access log format** - configurable log formats (Common, Combined, JSON)
@@ -251,5 +252,5 @@ We welcome contributions! Please see `CONTRIBUTING.md` for development guideline
 ---
 
 *Last updated: 2025-01-05*
-*Version: 0.2.0*
-*Next milestone: Phase 1 completion (Core HTTP Features)* 
+*Version: 0.4.0*
+*Next milestone: Phase 1.3 - Logging Infrastructure* 

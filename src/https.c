@@ -15,6 +15,7 @@
 #include "log.h"
 #include "util.h"
 #include "proxy.h"
+#include "headers.h"
 
 #define BUFFER_SIZE 4096
 #define TEMP_DEFAULT_PAGE "/index.html"
@@ -147,9 +148,28 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
   const char *mime_type = get_mime_type(file_path);
   char header[BUFFER_SIZE];
   snprintf(header, sizeof(header),
-           "HTTP/1.1 %d OK\r\nContent-Type: %s\r\nContent-Length: "
-           "%ld\r\nConnection: close\r\n\r\n",
-           status_code, mime_type, file_stat.st_size);
+           "HTTP/1.1 %d %s\r\n"
+           "Content-Type: %s\r\n"
+           "Content-Length: %ld\r\n"
+           "Server: ANX HTTP Server/0.4.0\r\n"
+           "Connection: close\r\n\r\n",
+           status_code, (status_code == 200) ? "OK" : "Not Found", mime_type,
+           file_stat.st_size);
+
+  // 创建头部处理上下文
+  header_context_t *header_ctx = NULL;
+  if (route.location) {
+    header_ctx = create_header_context(route.location->directives, route.location->directive_count);
+  }
+  if (!header_ctx && route.server) {
+    header_ctx = create_header_context(route.server->directives, route.server->directive_count);
+  }
+  
+  // 应用头部操作
+  if (header_ctx) {
+    apply_headers_to_response(header, sizeof(header), header_ctx, status_code, mime_type, file_stat.st_size);
+    free_header_context(header_ctx);
+  }
 
   SSL_write(ssl, header, strlen(header));
 

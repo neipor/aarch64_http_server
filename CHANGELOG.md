@@ -5,6 +5,187 @@ All notable changes to the ANX HTTP Server project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-01-05
+
+### 🚀 Major Feature: HTTP Header Manipulation System
+
+This release implements Phase 1.2 of the roadmap, delivering a comprehensive HTTP header manipulation system that allows fine-grained control over request and response headers.
+
+### Added
+- **Complete HTTP Header Operations**
+  - `add_header` directive: Add custom headers to responses
+  - `set_header` directive: Set/override existing headers
+  - `remove_header` directive: Remove unwanted headers
+  - Support for `always` flag to apply headers even in error responses
+- **Enhanced Response Headers**
+  - Automatic Server identification header
+  - Date header with GMT formatting
+  - Connection management headers
+  - Cache-Control headers for static files
+- **Security Headers Support**
+  - Strict-Transport-Security for HTTPS
+  - X-Frame-Options for clickjacking protection
+  - X-Content-Type-Options for MIME sniffing protection
+  - X-XSS-Protection for cross-site scripting protection
+  - Referrer-Policy for referrer information control
+- **CORS (Cross-Origin Resource Sharing)**
+  - Access-Control-Allow-Origin headers
+  - Access-Control-Allow-Methods headers
+  - Access-Control-Allow-Headers headers
+  - Perfect for API endpoints
+
+### Technical Implementation
+- **New Header Management Module**
+  - `src/headers.h` and `src/headers.c` for header operations
+  - Efficient string manipulation for header insertion
+  - Memory-safe buffer management
+- **Configuration Integration**
+  - Seamless integration with existing nginx-style configuration
+  - Support for server-level and location-level header operations
+  - Hierarchical header inheritance
+- **Runtime Performance**
+  - Optimized header application during response generation
+  - Minimal overhead for header processing
+  - Smart buffer management to prevent overflows
+
+### Configuration Examples
+```nginx
+server {
+    listen 8080;
+    server_name localhost;
+    
+    # Global server headers
+    add_header X-Server-Name ANX-HTTP-Server;
+    add_header X-Version 0.4.0;
+    
+    location / {
+        root ./www;
+        # Cache control for static files
+        add_header Cache-Control public-max-age-3600;
+    }
+    
+    location /api {
+        proxy_pass http://127.0.0.1:3000;
+        # CORS headers for API
+        add_header Access-Control-Allow-Origin *;
+        add_header Access-Control-Allow-Methods GET-POST-PUT-DELETE-OPTIONS;
+        add_header Access-Control-Allow-Headers Content-Type-Authorization;
+    }
+    
+    location /admin {
+        proxy_pass http://127.0.0.1:3001;
+        # Security headers for admin interface
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection 1-mode-block;
+    }
+}
+
+server {
+    listen 8443 ssl;
+    server_name localhost;
+    
+    # HTTPS security headers
+    add_header Strict-Transport-Security max-age-31536000-includeSubDomains;
+    add_header X-Forwarded-Proto https;
+    
+    location / {
+        root ./www;
+        add_header Cache-Control public-max-age-7200;
+    }
+}
+```
+
+### Testing and Validation
+- **Comprehensive Header Testing**
+  - Verified header insertion and formatting
+  - Tested static file header application
+  - Validated HTTPS security headers
+  - Confirmed configuration parsing accuracy
+- **Real-world Use Cases**
+  - API CORS headers for web applications
+  - Security headers for enhanced protection
+  - Cache control for performance optimization
+  - Custom branding headers
+
+### Developer Experience
+- **Debug Support**
+  - Added debug logging for header operations
+  - Clear error messages for configuration issues
+  - Comprehensive configuration validation
+- **Code Quality**
+  - Clean, modular header management code
+  - Memory-safe string operations
+  - Extensive error checking and validation
+
+### Nginx Compatibility
+- **Directive Compatibility**
+  - `add_header` directive matches nginx behavior
+  - Support for conditional header application
+  - Proper header inheritance and overrides
+- **Enhanced Configuration**
+  - Maintains full backward compatibility
+  - Extended configuration parsing capabilities
+  - Improved configuration debugging output
+
+## [0.3.0] - 2025-01-05
+
+### 🔄 Complete Reverse Proxy Implementation
+
+Building on the solid foundation of v0.2.0, this release delivers a fully functional reverse proxy system, implementing Phase 1.1 of the roadmap.
+
+### Added
+- **Full Reverse Proxy Support**
+  - Complete `proxy_pass` directive implementation
+  - HTTP and HTTPS backend support
+  - Automatic request/response forwarding
+  - Backend connection management
+- **Advanced URL Processing**
+  - Comprehensive URL parser (protocol, host, port, path)
+  - Intelligent path transformation
+  - Query string preservation
+- **Proxy Header Management**
+  - Automatic X-Forwarded-For injection
+  - X-Forwarded-Proto header for protocol awareness
+  - Host header transformation for backend compatibility
+- **Error Handling and Resilience**
+  - 502 Bad Gateway on backend failures
+  - 30-second connection timeout
+  - Proper resource cleanup on errors
+- **Production Features**
+  - Connection pooling foundation
+  - Backend health detection
+  - Comprehensive error logging
+
+### Technical Implementation
+- **New Proxy Module** (`src/proxy.h`, `src/proxy.c`)
+  - 350+ lines of production-quality proxy code
+  - Memory-safe URL parsing and manipulation
+  - Robust error handling and cleanup
+- **Enhanced Routing System**
+  - Fixed server selection logic (port + host matching)
+  - Improved location block processing
+  - Better debugging and logging
+- **Configuration Updates**
+  - Updated `server.conf` with comprehensive proxy examples
+  - Multiple backend server configurations
+  - Real-world proxy patterns
+
+### Validated Functionality
+- **HTTP Proxy** (Port 8080)
+  - `/api` → `http://127.0.0.1:3000`
+  - `/admin` → `http://127.0.0.1:3001`
+  - Static files at `/`
+- **HTTPS Proxy** (Port 8443)
+  - `/api` → `http://127.0.0.1:3000`
+  - `/service` → `http://127.0.0.1:3002`
+  - SSL termination with backend HTTP
+
+### Git Milestone
+- Tagged as `v0.3.0` with complete feature set
+- Comprehensive commit history
+- Ready for production proxy workloads
+
 ## [0.2.0] - 2025-01-05
 
 ### 🎉 Major Milestone: Full HTTP/HTTPS Functionality
