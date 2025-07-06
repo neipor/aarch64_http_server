@@ -1,4 +1,9 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "headers.h"
+#include "config.h"
 #include "log.h"
 #include <stdio.h>
 #include <stdlib.h>

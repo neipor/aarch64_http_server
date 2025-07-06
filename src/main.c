@@ -14,6 +14,7 @@
 
 pid_t worker_pids[128];
 int num_workers_spawned = 0;
+log_config_t *global_log_config = NULL;
 
 void signal_handler(int signum) {
     char msg[128];
@@ -27,7 +28,8 @@ void signal_handler(int signum) {
 }
 
 int main(int argc, char *argv[]) {
-    log_init("anx.log", LOG_LEVEL_DEBUG);
+    // Initialize basic logging first
+    log_init("stderr", LOG_LEVEL_INFO);
 
     char *config_file = "server.conf"; // Default config path
     int opt;
@@ -49,11 +51,21 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // Extract and initialize logging configuration
+    global_log_config = extract_log_config(config);
+    if (global_log_config) {
+        init_logging_from_config(global_log_config);
+        log_message(LOG_LEVEL_INFO, "ANX HTTP Server starting up...");
+    } else {
+        log_message(LOG_LEVEL_WARNING, "Failed to extract log configuration, using defaults");
+    }
+
     // 2. Process the syntax tree into a usable core configuration
     core_config_t *core_conf = create_core_config(config);
     if (!core_conf) {
         log_message(LOG_LEVEL_ERROR, "Failed to process configuration. Exiting.");
         free_config(config);
+        cleanup_logging();
         return EXIT_FAILURE;
     }
     
@@ -85,6 +97,8 @@ int main(int argc, char *argv[]) {
             ssl_ctx = SSL_CTX_new(TLS_server_method());
             if (!ssl_ctx) {
                 ERR_print_errors_fp(stderr);
+                log_message(LOG_LEVEL_ERROR, "Failed to create SSL context");
+                cleanup_logging();
                 exit(EXIT_FAILURE);
             }
 
@@ -92,12 +106,14 @@ int main(int argc, char *argv[]) {
                                              SSL_FILETYPE_PEM) <= 0) {
                 ERR_print_errors_fp(stderr);
                 log_message(LOG_LEVEL_ERROR, "Failed to load certificate file.");
+                cleanup_logging();
                 exit(EXIT_FAILURE);
             }
             if (SSL_CTX_use_PrivateKey_file(ssl_ctx, key_file,
                                             SSL_FILETYPE_PEM) <= 0) {
                 ERR_print_errors_fp(stderr);
                 log_message(LOG_LEVEL_ERROR, "Failed to load private key file.");
+                cleanup_logging();
                 exit(EXIT_FAILURE);
             }
             log_message(LOG_LEVEL_INFO, "SSL Context initialized successfully.");
@@ -146,6 +162,7 @@ int main(int argc, char *argv[]) {
         pid_t pid = fork();
         if (pid == -1) {
             perror("fork failed");
+            cleanup_logging();
             exit(EXIT_FAILURE);
         } else if (pid == 0) {
             // Pass only the valid FDs
@@ -183,6 +200,9 @@ int main(int argc, char *argv[]) {
 
     if (ssl_ctx) SSL_CTX_free(ssl_ctx);
     free_core_config(core_conf);
+
+    // Cleanup logging at the end
+    cleanup_logging();
 
     log_message(LOG_LEVEL_DEBUG, "--> main: END");
     return 0;
