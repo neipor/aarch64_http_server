@@ -106,13 +106,17 @@ format:
 	@echo "Code formatted!"
 
 # 依赖关系
-$(OBJDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/server.h $(SRCDIR)/config.h $(SRCDIR)/log.h
+$(OBJDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/config.h $(SRCDIR)/core.h $(SRCDIR)/log.h $(SRCDIR)/net.h $(SRCDIR)/https.h
 $(OBJDIR)/server.o: $(SRCDIR)/server.c $(SRCDIR)/server.h $(SRCDIR)/core.h $(SRCDIR)/net.h $(SRCDIR)/http.h $(SRCDIR)/https.h $(SRCDIR)/log.h
 $(OBJDIR)/config.o: $(SRCDIR)/config.c $(SRCDIR)/config.h $(SRCDIR)/log.h $(SRCDIR)/compress.h $(SRCDIR)/cache.h $(SRCDIR)/health_check.h
 $(OBJDIR)/core.o: $(SRCDIR)/core.c $(SRCDIR)/core.h $(SRCDIR)/config.h $(SRCDIR)/log.h $(SRCDIR)/cache.h $(SRCDIR)/load_balancer.h $(SRCDIR)/health_check.h
 $(OBJDIR)/net.o: $(SRCDIR)/net.c $(SRCDIR)/net.h $(SRCDIR)/log.h
-$(OBJDIR)/http.o: $(SRCDIR)/http.c $(SRCDIR)/http.h $(SRCDIR)/core.h $(SRCDIR)/log.h $(SRCDIR)/util.h $(SRCDIR)/proxy.h $(SRCDIR)/lb_proxy.h $(SRCDIR)/headers.h $(SRCDIR)/compress.h $(SRCDIR)/cache.h
-$(OBJDIR)/https.o: $(SRCDIR)/https.c $(SRCDIR)/https.h $(SRCDIR)/core.h $(SRCDIR)/log.h $(SRCDIR)/util.h $(SRCDIR)/proxy.h $(SRCDIR)/lb_proxy.h $(SRCDIR)/headers.h $(SRCDIR)/compress.h $(SRCDIR)/cache.h
+$(OBJDIR)/http.o: $(SRCDIR)/http.c $(SRCDIR)/http.h $(SRCDIR)/core.h $(SRCDIR)/log.h $(SRCDIR)/util.h $(SRCDIR)/proxy.h $(SRCDIR)/lb_proxy.h $(SRCDIR)/headers.h $(SRCDIR)/compress.h $(SRCDIR)/cache.h $(SRCDIR)/chunked.h $(SRCDIR)/bandwidth.h
+$(OBJDIR)/https.o: $(SRCDIR)/https.c $(SRCDIR)/https.h $(SRCDIR)/core.h $(SRCDIR)/log.h $(SRCDIR)/util.h $(SRCDIR)/proxy.h $(SRCDIR)/lb_proxy.h $(SRCDIR)/headers.h $(SRCDIR)/compress.h $(SRCDIR)/cache.h $(SRCDIR)/chunked.h $(SRCDIR)/bandwidth.h
+$(OBJDIR)/chunked.o: $(SRCDIR)/chunked.c $(SRCDIR)/chunked.h $(SRCDIR)/log.h
+$(OBJDIR)/bandwidth.o: $(SRCDIR)/bandwidth.c $(SRCDIR)/bandwidth.h $(SRCDIR)/log.h
+$(OBJDIR)/stream.o: $(SRCDIR)/stream.c $(SRCDIR)/stream.h $(SRCDIR)/load_balancer.h $(SRCDIR)/log.h
+$(OBJDIR)/push.o: $(SRCDIR)/push.c $(SRCDIR)/push.h $(SRCDIR)/log.h
 $(OBJDIR)/log.o: $(SRCDIR)/log.c $(SRCDIR)/log.h
 $(OBJDIR)/util.o: $(SRCDIR)/util.c $(SRCDIR)/util.h
 $(OBJDIR)/proxy.o: $(SRCDIR)/proxy.c $(SRCDIR)/proxy.h $(SRCDIR)/log.h

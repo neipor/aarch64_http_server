@@ -6,6 +6,7 @@
 #include "log.h"
 #include "compress.h"
 #include "cache.h"
+#include "bandwidth.h"
 
 // 前向声明
 typedef struct health_check_config health_check_config_t;
@@ -82,6 +83,9 @@ typedef struct {
   
   // 缓存配置
   cache_config_t *cache;
+  
+  // 带宽限制配置
+  bandwidth_config_t *bandwidth;
 } config_t;
 
 // Helper function to find the value of a directive within an array.
@@ -108,5 +112,9 @@ log_config_t *get_default_log_config(void);
 // 健康检查配置解析函数
 health_check_config_t *parse_health_check_config(const directive_t *directives, int count);
 void free_health_check_config(health_check_config_t *config);
+
+// 带宽限制配置解析函数
+bandwidth_config_t *parse_bandwidth_config(const directive_t *directives, int count);
+void free_bandwidth_config(bandwidth_config_t *config);
 
 #endif  // CONFIG_H 

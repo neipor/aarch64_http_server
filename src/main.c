@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <getopt.h>
 
 #include "config.h"
 #include "core.h"

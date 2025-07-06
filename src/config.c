@@ -7,6 +7,7 @@
 #include "log.h"
 #include "compress.h"
 #include "health_check.h"
+#include "bandwidth.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -443,6 +444,16 @@ config_t *parse_config(const char *filename) {
         return NULL;
     }
     
+    // 初始化带宽限制配置
+    new_config->bandwidth = bandwidth_config_create();
+    if (!new_config->bandwidth) {
+        log_message(LOG_LEVEL_ERROR, "Failed to create bandwidth config");
+        compress_config_free(new_config->compress);
+        cache_config_free(new_config->cache);
+        free(new_config);
+        return NULL;
+    }
+    
     int token_idx = 0;
     while (token_idx < token_count) {
         if (strcmp(tokens[token_idx], "http") == 0) {
@@ -462,6 +473,11 @@ config_t *parse_config(const char *filename) {
                 handle_compression_directive(new_config, dir->key, dir->value);
             } else if (strncmp(dir->key, "proxy_cache", 11) == 0) {
                 handle_cache_directive(new_config, dir->key, dir->value);
+            } else if (strncmp(dir->key, "bandwidth", 9) == 0 || 
+                       strncmp(dir->key, "enable_bandwidth", 16) == 0 ||
+                       strncmp(dir->key, "default_rate", 12) == 0 ||
+                       strncmp(dir->key, "min_file_size", 13) == 0) {
+                handle_bandwidth_directive(new_config, dir->key, dir->value);
             }
         }
     }
@@ -586,6 +602,9 @@ void free_config(config_t *config) {
   }
   if (config->cache) {
     cache_config_free(config->cache);
+  }
+  if (config->bandwidth) {
+    bandwidth_config_free(config->bandwidth);
   }
   free(config);
 }
@@ -845,6 +864,88 @@ int handle_cache_directive(config_t *config, const char *directive, const char *
     return 0;
 }
 
+// 处理带宽限制配置指令
+int handle_bandwidth_directive(config_t *config, const char *directive, const char *value) {
+    if (!config || !config->bandwidth) {
+        return -1;
+    }
+    
+    if (strcmp(directive, "enable_bandwidth_limit") == 0) {
+        config->bandwidth->enable_bandwidth_limit = (strcmp(value, "on") == 0);
+    }
+    else if (strcmp(directive, "default_rate_limit") == 0) {
+        char *endptr;
+        long rate = strtol(value, &endptr, 10);
+        if (rate > 0) {
+            bandwidth_unit_t unit = bandwidth_parse_unit(endptr);
+            config->bandwidth->default_rate_limit = bandwidth_convert_to_bytes_per_second(rate, unit);
+        }
+    }
+    else if (strcmp(directive, "default_burst_size") == 0) {
+        char *endptr;
+        long burst = strtol(value, &endptr, 10);
+        if (*endptr == 'k' || *endptr == 'K') {
+            burst *= 1024;
+        } else if (*endptr == 'm' || *endptr == 'M') {
+            burst *= 1024 * 1024;
+        }
+        if (burst > 0) {
+            config->bandwidth->default_burst_size = burst;
+        }
+    }
+    else if (strcmp(directive, "min_file_size") == 0) {
+        char *endptr;
+        long size = strtol(value, &endptr, 10);
+        if (*endptr == 'k' || *endptr == 'K') {
+            size *= 1024;
+        } else if (*endptr == 'm' || *endptr == 'M') {
+            size *= 1024 * 1024;
+        }
+        if (size > 0) {
+            config->bandwidth->min_file_size = size;
+        }
+    }
+    else if (strcmp(directive, "bandwidth_limit") == 0) {
+        // 解析带宽限制规则: bandwidth_limit "*.mp4" 100k burst=1m;
+        // 或者: bandwidth_limit path="*.mp4" mime="video/mp4" client="192.168.1.*" rate=100k burst=1m;
+        
+        // 简化解析，假设格式为: pattern rate [burst=size]
+        char *params = strdup(value);
+        char *pattern = strtok(params, " ");
+        char *rate_str = strtok(NULL, " ");
+        char *burst_str = strtok(NULL, " ");
+        
+        if (pattern && rate_str) {
+            // 解析速率
+            char *endptr;
+            long rate = strtol(rate_str, &endptr, 10);
+            bandwidth_unit_t unit = bandwidth_parse_unit(endptr);
+            
+            // 解析突发大小
+            size_t burst_size = config->bandwidth->default_burst_size;
+            if (burst_str && strncmp(burst_str, "burst=", 6) == 0) {
+                char *burst_val = burst_str + 6;
+                long burst = strtol(burst_val, &endptr, 10);
+                if (*endptr == 'k' || *endptr == 'K') {
+                    burst *= 1024;
+                } else if (*endptr == 'm' || *endptr == 'M') {
+                    burst *= 1024 * 1024;
+                }
+                if (burst > 0) {
+                    burst_size = burst;
+                }
+            }
+            
+            // 添加规则
+            bandwidth_config_add_rule(config->bandwidth, pattern, NULL, NULL, rate, unit, burst_size);
+        }
+        
+        free(params);
+    }
+    
+    return 0;
+}
+
 // 处理配置指令
 int handle_config_directive(config_t *config, const char *directive, const char *value) {
     if (strcmp(directive, "worker_processes") == 0) {
@@ -934,5 +1035,32 @@ health_check_config_t *parse_health_check_config(const directive_t *directives, 
 void free_health_check_config(health_check_config_t *config) {
     if (config) {
         health_check_config_free(config);
+    }
+}
+
+// 带宽限制配置解析函数
+bandwidth_config_t *parse_bandwidth_config(const directive_t *directives, int count) {
+    if (!directives || count == 0) return NULL;
+    
+    bandwidth_config_t *config = bandwidth_config_create();
+    if (!config) return NULL;
+    
+    for (int i = 0; i < count; i++) {
+        const char *key = directives[i].key;
+        const char *value = directives[i].value;
+        
+        if (bandwidth_parse_config_directive(config, key, value) < 0) {
+            char log_msg[256];
+            snprintf(log_msg, sizeof(log_msg), "Unknown bandwidth directive: %s", key);
+            log_message(LOG_LEVEL_WARNING, log_msg);
+        }
+    }
+    
+    return config;
+}
+
+void free_bandwidth_config(bandwidth_config_t *config) {
+    if (config) {
+        bandwidth_config_free(config);
     }
 } 

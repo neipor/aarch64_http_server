@@ -15,13 +15,21 @@ ANX is a high-performance HTTP/HTTPS server written in C, designed to be fast, s
   - Epoll-based event handling
   - Keep-alive connections
   - Static file serving optimization
-  - Content compression (NEW in v0.6.0)
+  - Content compression with gzip
+  - Bandwidth limiting for large files (NEW in v0.8.0)
 
-- **Reverse Proxy**
+- **Reverse Proxy & Load Balancing**
   - Backend connection pooling
-  - Load balancing (coming soon)
+  - Advanced load balancing with 6 algorithms (NEW in v0.8.0)
   - Upstream health checks
-  - Proxy protocol support
+  - Session persistence
+  - Automatic failover
+
+- **Streaming & Real-time (NEW in v0.8.0)**
+  - Chunked transfer encoding
+  - Server-Sent Events (SSE) push notifications
+  - Stream module for TCP/UDP proxy
+  - Real-time connection management
 
 - **Security**
   - SSL/TLS support
@@ -126,12 +134,26 @@ ANX comes with comprehensive test suites:
 
 ## Version History
 
-- **v0.6.0** - Content compression support (2025-01-06)
-- **v0.5.0** - Access logging system (2025-01-05)
-- **v0.4.0** - HTTP header manipulation (2025-01-04)
-- **v0.3.0** - Reverse proxy implementation (2025-01-03)
-- **v0.2.0** - Basic HTTP/HTTPS server (2025-01-02)
-- **v0.1.0** - Initial release (2025-01-01)
+- **v0.8.0** - Streaming & Real-time features (2024-12-19)
+  - Chunked transfer encoding support
+  - Bandwidth limiting with token bucket algorithm
+  - Server-Sent Events (SSE) push notifications
+  - Stream module for TCP/UDP load balancing
+  - Real-time connection management
+- **v0.7.0** - Cache system implementation (2024-12-19)
+  - Memory caching with LRU/LFU/FIFO strategies
+  - HTTP caching protocol support (ETag, Last-Modified)
+  - Cache statistics and monitoring
+- **v0.6.0** - Load balancing system (2024-12-19)
+  - Upstream server groups
+  - 6 load balancing algorithms
+  - Health check and automatic failover
+  - Session persistence
+- **v0.5.0** - Content compression support (2025-01-06)
+- **v0.4.0** - Access logging system (2025-01-05)
+- **v0.3.0** - HTTP header manipulation (2025-01-04)
+- **v0.2.0** - Reverse proxy implementation (2025-01-03)
+- **v0.1.0** - Basic HTTP/HTTPS server (2025-01-02)
 
 ## Contributing
 

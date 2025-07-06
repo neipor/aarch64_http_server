@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "http.h"
 
 #include <errno.h>
@@ -8,6 +12,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "config.h"
 #include "core.h"
@@ -19,6 +26,8 @@
 #include "compress.h"
 #include "cache.h"
 #include "health_api.h"
+#include "chunked.h"
+#include "bandwidth.h"
 
 #define BUFFER_SIZE 4096
 #define TEMP_DEFAULT_PAGE "/index.html"
@@ -61,6 +70,18 @@ static char *get_referer(const char *buffer) {
     if (!ref_end) return strdup("-");
 
     return strndup(ref_start, ref_end - ref_start);
+}
+
+// Helper to get client IP address from socket
+static char *get_client_ip(int client_socket) {
+    struct sockaddr_in client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+    
+    if (getpeername(client_socket, (struct sockaddr *)&client_addr, &addr_len) == 0) {
+        return strdup(inet_ntoa(client_addr.sin_addr));
+    }
+    
+    return strdup("127.0.0.1"); // 默认返回本地IP
 }
 
 // 提取HTTP头部信息
@@ -563,6 +584,12 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
 
     const char *mime_type = get_mime_type(file_path);
     
+    // 检查是否需要使用分块传输编码
+    bool use_chunked_encoding = false;
+    if (http_version && chunked_is_supported(buffer)) {
+        use_chunked_encoding = chunked_should_use(mime_type, file_stat.st_size);
+    }
+    
     // 检查是否需要压缩
     char *accept_encoding = extract_header_value(buffer, "Accept-Encoding");
     bool should_compress = false;
@@ -622,13 +649,26 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
 
     // 构建响应头
     char header[BUFFER_SIZE * 2];
-    int header_len = snprintf(header, sizeof(header),
-             "HTTP/1.1 %d %s\r\n"
-             "Content-Type: %s\r\n"
-             "Content-Length: %ld\r\n"
-             "Server: ANX HTTP Server/0.6.0\r\n",
-             status_code, (status_code == 200) ? "OK" : "Not Found", mime_type,
-             final_content_length);
+    int header_len;
+    
+    if (use_chunked_encoding) {
+        // 使用分块传输编码
+        header_len = snprintf(header, sizeof(header),
+                 "HTTP/1.1 %d %s\r\n"
+                 "Content-Type: %s\r\n"
+                 "Transfer-Encoding: chunked\r\n"
+                 "Server: ANX HTTP Server/0.8.0\r\n",
+                 status_code, (status_code == 200) ? "OK" : "Not Found", mime_type);
+    } else {
+        // 使用Content-Length
+        header_len = snprintf(header, sizeof(header),
+                 "HTTP/1.1 %d %s\r\n"
+                 "Content-Type: %s\r\n"
+                 "Content-Length: %ld\r\n"
+                 "Server: ANX HTTP Server/0.8.0\r\n",
+                 status_code, (status_code == 200) ? "OK" : "Not Found", mime_type,
+                 final_content_length);
+    }
     
     // 添加压缩相关头部
     if (should_compress) {
@@ -651,24 +691,120 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
     if (!header_ctx && route.server) {
         header_ctx = create_header_context(route.server->directives, route.server->directive_count);
     }
-    
-    // 应用头部操作
-    if (header_ctx) {
-        apply_headers_to_response(header, sizeof(header), header_ctx, status_code, mime_type, final_content_length);
-        free_header_context(header_ctx);
+
+    // 检查是否需要带宽限制
+    bandwidth_controller_t *bandwidth_ctrl = NULL;
+    bandwidth_config_t *bandwidth_config = NULL;
+    if (core_conf && core_conf->raw_config && core_conf->raw_config->bandwidth) {
+        bandwidth_config = core_conf->raw_config->bandwidth;
+        
+        // 检查是否启用带宽限制并且文件大小满足条件
+        if (bandwidth_config->enable_bandwidth_limit && 
+            file_stat.st_size >= bandwidth_config->min_file_size) {
+            
+            // 查找匹配的带宽限制规则
+            bandwidth_rule_t *rule = bandwidth_config_find_rule(bandwidth_config, 
+                                                              file_path, mime_type, 
+                                                              get_client_ip(client_socket));
+            
+            size_t rate_limit = bandwidth_config->default_rate_limit;
+            size_t burst_size = bandwidth_config->default_burst_size;
+            
+            if (rule) {
+                rate_limit = rule->rate_limit;
+                burst_size = rule->burst_size;
+            }
+            
+            // 创建带宽控制器
+            bandwidth_ctrl = bandwidth_controller_create(rate_limit, burst_size);
+            if (bandwidth_ctrl) {
+                char log_msg[256];
+                snprintf(log_msg, sizeof(log_msg), "Applying bandwidth limit: %zu B/s, burst: %zu B", 
+                         rate_limit, burst_size);
+                log_message(LOG_LEVEL_DEBUG, log_msg);
+            }
+        }
     }
 
     // 发送响应
-    write(client_socket, header, strlen(header));
-    
-    if (should_compress && compressed_data) {
-        // 发送压缩后的数据
-        write(client_socket, compressed_data, compressed_size);
-        free(compressed_data);
+    if (use_chunked_encoding) {
+        // 使用分块传输编码
+        chunked_context_t *chunked_ctx = chunked_context_create(client_socket, NULL);
+        if (chunked_ctx) {
+            // 应用头部操作
+            if (header_ctx) {
+                apply_headers_to_response(header, sizeof(header), header_ctx, status_code, mime_type, final_content_length);
+                free_header_context(header_ctx);
+                header_ctx = NULL; // 避免重复释放
+            }
+            
+            // 发送头部（不包含Transfer-Encoding，因为chunked模块会处理）
+            if (bandwidth_ctrl) {
+                bandwidth_controlled_send(client_socket, header, strlen(header), bandwidth_ctrl);
+            } else {
+                write(client_socket, header, strlen(header));
+            }
+            
+            // 创建分块传输编码配置
+            chunked_config_t *chunked_config = chunked_get_default_config();
+            if (chunked_config) {
+                chunked_config->enable_trailer = true;
+                
+                if (should_compress && compressed_data) {
+                    // 发送压缩后的数据（分块方式）
+                    const char *trailer = "X-Content-Encoding: gzip\r\n";
+                    chunked_send_chunk(chunked_ctx, (const char *)compressed_data, compressed_size);
+                    chunked_send_final_chunk(chunked_ctx, trailer);
+                    free(compressed_data);
+                } else {
+                    // 发送原始文件（分块方式）
+                    chunked_send_file_stream(chunked_ctx, file_fd, file_stat.st_size, chunked_config);
+                }
+                
+                chunked_config_free(chunked_config);
+            }
+            
+            chunked_context_free(chunked_ctx);
+        }
     } else {
-        // 发送原始文件
-        lseek(file_fd, 0, SEEK_SET); // 重置文件指针
-        sendfile(client_socket, file_fd, NULL, file_stat.st_size);
+        // 使用传统的Content-Length方式
+        
+        // 应用头部操作
+        if (header_ctx) {
+            apply_headers_to_response(header, sizeof(header), header_ctx, status_code, mime_type, final_content_length);
+            free_header_context(header_ctx);
+            header_ctx = NULL; // 避免重复释放
+        }
+        
+        // 发送头部
+        if (bandwidth_ctrl) {
+            bandwidth_controlled_send(client_socket, header, strlen(header), bandwidth_ctrl);
+        } else {
+            write(client_socket, header, strlen(header));
+        }
+        
+        if (should_compress && compressed_data) {
+            // 发送压缩后的数据
+            if (bandwidth_ctrl) {
+                bandwidth_controlled_send(client_socket, (const char *)compressed_data, compressed_size, bandwidth_ctrl);
+            } else {
+                write(client_socket, compressed_data, compressed_size);
+            }
+            free(compressed_data);
+        } else {
+            // 发送原始文件
+            lseek(file_fd, 0, SEEK_SET); // 重置文件指针
+            if (bandwidth_ctrl) {
+                bandwidth_controlled_sendfile(client_socket, file_fd, NULL, file_stat.st_size, bandwidth_ctrl);
+            } else {
+                sendfile(client_socket, file_fd, NULL, file_stat.st_size);
+            }
+        }
+    }
+    
+    // 清理带宽控制器
+    if (bandwidth_ctrl) {
+        bandwidth_controller_free(bandwidth_ctrl);
     }
     
     // 将内容添加到缓存
@@ -703,6 +839,9 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
     }
     if (accept_encoding) {
         free(accept_encoding);
+    }
+    if (header_ctx) {
+        free_header_context(header_ctx);
     }
     close(file_fd);
     
