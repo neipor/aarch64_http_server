@@ -1,7 +1,0 @@
-.git
-*.o
-anx
-build/
-*.log
-core
-*.d 
