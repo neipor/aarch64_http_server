@@ -1,7 +1,13 @@
 #ifndef CORE_H
 #define CORE_H
 
+#include <openssl/ssl.h>
 #include "config.h"
+#include "cache.h"
+#include "load_balancer.h"
+
+// 前向声明
+typedef struct lb_config lb_config_t;
 
 // Represents a single listening endpoint (a socket)
 typedef struct {
@@ -20,6 +26,12 @@ typedef struct {
   // A pointer back to the raw parsed config tree
   config_t *raw_config;
   // We can add pointers to processed virtual host configs here later
+  
+  // 缓存管理器
+  cache_manager_t *cache_manager;
+  
+  // 负载均衡配置
+  lb_config_t *lb_config;
 } core_config_t;
 
 // This struct holds the result of a routing decision.

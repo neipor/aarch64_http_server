@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include "log.h"
 #include "compress.h"
+#include "cache.h"
+
+// 前向声明
+typedef struct health_check_config health_check_config_t;
 
 // Represents a single "key value;" directive in nginx config
 typedef struct {
@@ -20,6 +24,30 @@ typedef struct location_block {
   struct location_block *next;
 } location_block_t;
 
+// Represents an upstream server entry
+typedef struct upstream_server_entry {
+  char *host;
+  int port;
+  int weight;
+  int max_fails;
+  int fail_timeout;
+  int max_conns;
+  // 健康检查配置
+  health_check_config_t *health_config;
+  struct upstream_server_entry *next;
+} upstream_server_entry_t;
+
+// Represents an upstream { ... } block
+typedef struct upstream_block {
+  char *name;
+  directive_t *directives;
+  int directive_count;
+  upstream_server_entry_t *servers;
+  // 全局健康检查配置
+  health_check_config_t *default_health_config;
+  struct upstream_block *next;
+} upstream_block_t;
+
 // Represents a server { ... } block
 typedef struct server_block {
   directive_t *directives;
@@ -33,6 +61,7 @@ typedef struct {
   directive_t *directives;
   int directive_count;
   server_block_t *servers;
+  upstream_block_t *upstreams;
 } http_block_t;
 
 // The root of our entire configuration
@@ -50,6 +79,9 @@ typedef struct {
   
   // 压缩配置
   compress_config_t *compress;
+  
+  // 缓存配置
+  cache_config_t *cache;
 } config_t;
 
 // Helper function to find the value of a directive within an array.
@@ -72,5 +104,9 @@ access_log_format_t parse_log_format(const char *format_str);
 
 // Get default log configuration
 log_config_t *get_default_log_config(void);
+
+// 健康检查配置解析函数
+health_check_config_t *parse_health_check_config(const directive_t *directives, int count);
+void free_health_check_config(health_check_config_t *config);
 
 #endif  // CONFIG_H 

@@ -16,8 +16,10 @@
 #include "log.h"
 #include "util.h"
 #include "proxy.h"
+#include "lb_proxy.h"
 #include "headers.h"
 #include "compress.h"
+#include "cache.h"
 
 #define BUFFER_SIZE 4096
 #define TEMP_DEFAULT_PAGE "/index.html"
@@ -99,7 +101,8 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
     int bytes_read = SSL_read(ssl, buffer, sizeof(buffer) - 1);
 
     if (bytes_read <= 0) {
-        // Handle SSL read error or closed connection
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
         return;
     }
     buffer[bytes_read] = '\0';
@@ -111,6 +114,14 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
     char *host = get_host(buffer);
     char *user_agent = get_user_agent(buffer);
     char *referer = get_referer(buffer);
+
+    // 提取条件请求头部
+    char *if_none_match = extract_header_value(buffer, "If-None-Match");
+    char *if_modified_since_str = extract_header_value(buffer, "If-Modified-Since");
+    time_t if_modified_since = 0;
+    if (if_modified_since_str) {
+        if_modified_since = atol(if_modified_since_str);
+    }
 
     // Create access log entry
     access_log_entry_t *access_entry = create_access_log_entry();
@@ -168,6 +179,10 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
         free(host);
         free(user_agent);
         free(referer);
+        if (if_none_match) free(if_none_match);
+        if (if_modified_since_str) free(if_modified_since_str);
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
         return;
     }
 
@@ -201,6 +216,10 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
         free(buffer_copy);
         free(user_agent);
         free(referer);
+        if (if_none_match) free(if_none_match);
+        if (if_modified_since_str) free(if_modified_since_str);
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
         return;
     }
 
@@ -232,8 +251,21 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
     // 如果配置了proxy_pass，执行反向代理
     if (proxy_pass) {
         char *headers = extract_ssl_headers(buffer);
-        int result = handle_https_proxy_request(ssl, method, req_path, http_version, 
+        int result = -1;
+        
+        // 检查是否为upstream代理
+        if (is_upstream_proxy(proxy_pass)) {
+            char *upstream_name = extract_upstream_name(proxy_pass);
+            if (upstream_name) {
+                result = handle_lb_https_proxy_request(ssl, method, req_path, http_version, 
+                                                     headers, upstream_name, client_ip, core_conf);
+                free(upstream_name);
+            }
+        } else {
+            // 传统的直接代理
+            result = handle_https_proxy_request(ssl, method, req_path, http_version, 
                                               headers, proxy_pass, client_ip);
+        }
         
         if (access_entry) {
             free(access_entry->upstream_addr);
@@ -279,6 +311,10 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
         free(buffer_copy);
         free(user_agent);
         free(referer);
+        if (if_none_match) free(if_none_match);
+        if (if_modified_since_str) free(if_modified_since_str);
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
         return;
     }
 
@@ -368,6 +404,110 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
         }
     }
     
+    // 检查缓存
+    cache_response_t *cached_response = NULL;
+    if (core_conf->cache_manager && method && strcmp(method, "GET") == 0) {
+        cached_response = cache_get(core_conf->cache_manager, req_path, 
+                                   if_none_match, if_modified_since);
+        
+        if (cached_response) {
+            if (cached_response->needs_validation) {
+                // 304 Not Modified
+                const char *response = "HTTP/1.1 304 Not Modified\r\n"
+                                      "Server: ANX HTTP Server/0.6.0\r\n"
+                                      "Connection: close\r\n\r\n";
+                SSL_write(ssl, response, strlen(response));
+                
+                if (access_entry) {
+                    access_entry->status_code = 304;
+                    access_entry->response_size = strlen(response);
+                    
+                    struct timeval end_time;
+                    gettimeofday(&end_time, NULL);
+                    access_entry->request_duration_ms = 
+                        (end_time.tv_sec - start_time.tv_sec) * 1000.0 +
+                        (end_time.tv_usec - start_time.tv_usec) / 1000.0;
+                    
+                    log_access_entry(access_entry);
+                    free_access_log_entry(access_entry);
+                }
+                
+                cache_response_free(cached_response);
+                free(host);
+                free(buffer_copy);
+                free(user_agent);
+                free(referer);
+                if (if_none_match) free(if_none_match);
+                if (if_modified_since_str) free(if_modified_since_str);
+                SSL_shutdown(ssl);
+                SSL_free(ssl);
+                return;
+            }
+            
+            if (cached_response->is_cached && cached_response->content) {
+                // 从缓存返回内容
+                const char *mime_type = cached_response->content_type ? 
+                                       cached_response->content_type : "application/octet-stream";
+                
+                char header[BUFFER_SIZE * 2];
+                int header_len = snprintf(header, sizeof(header),
+                         "HTTP/1.1 200 OK\r\n"
+                         "Content-Type: %s\r\n"
+                         "Content-Length: %zu\r\n"
+                         "Server: ANX HTTP Server/0.6.0\r\n"
+                         "X-Cache: HIT\r\n",
+                         mime_type, cached_response->content_length);
+                
+                if (cached_response->etag) {
+                    header_len += snprintf(header + header_len, sizeof(header) - header_len,
+                                          "ETag: %s\r\n", cached_response->etag);
+                }
+                
+                if (cached_response->last_modified > 0) {
+                    header_len += snprintf(header + header_len, sizeof(header) - header_len,
+                                          "Last-Modified: %ld\r\n", cached_response->last_modified);
+                }
+                
+                if (cached_response->is_compressed) {
+                    header_len += snprintf(header + header_len, sizeof(header) - header_len,
+                                          "Content-Encoding: gzip\r\n"
+                                          "Vary: Accept-Encoding\r\n");
+                }
+                
+                header_len += snprintf(header + header_len, sizeof(header) - header_len,
+                                      "Connection: close\r\n\r\n");
+                
+                SSL_write(ssl, header, strlen(header));
+                SSL_write(ssl, cached_response->content, cached_response->content_length);
+                
+                if (access_entry) {
+                    access_entry->status_code = 200;
+                    access_entry->response_size = strlen(header) + cached_response->content_length;
+                    
+                    struct timeval end_time;
+                    gettimeofday(&end_time, NULL);
+                    access_entry->request_duration_ms = 
+                        (end_time.tv_sec - start_time.tv_sec) * 1000.0 +
+                        (end_time.tv_usec - start_time.tv_usec) / 1000.0;
+                    
+                    log_access_entry(access_entry);
+                    free_access_log_entry(access_entry);
+                }
+                
+                cache_response_free(cached_response);
+                free(host);
+                free(buffer_copy);
+                free(user_agent);
+                free(referer);
+                if (if_none_match) free(if_none_match);
+                if (if_modified_since_str) free(if_modified_since_str);
+                SSL_shutdown(ssl);
+                SSL_free(ssl);
+                return;
+            }
+        }
+    }
+
     // 构建响应头
     char header[BUFFER_SIZE * 2];
     int header_len = snprintf(header, sizeof(header),
@@ -436,12 +576,30 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
         status_code = 500;
     }
     
-    // 清理资源
-    if (compress_ctx) {
-        compress_context_free(compress_ctx);
-    }
-    if (accept_encoding) {
-        free(accept_encoding);
+    // 将内容添加到缓存
+    if (core_conf->cache_manager && method && strcmp(method, "GET") == 0 && 
+        status_code == 200 && file_stat.st_size > 0) {
+        
+        if (cache_config_is_cacheable(core_conf->raw_config->cache, mime_type, file_stat.st_size)) {
+            // 读取文件内容用于缓存
+            char *file_content_for_cache = malloc(file_stat.st_size);
+            if (file_content_for_cache) {
+                lseek(file_fd, 0, SEEK_SET);
+                if (read(file_fd, file_content_for_cache, file_stat.st_size) == file_stat.st_size) {
+                    // 存储到缓存（如果已压缩则存储压缩版本）
+                    if (should_compress && compressed_data) {
+                        cache_put(core_conf->cache_manager, req_path, 
+                                 (char *)compressed_data, compressed_size, 
+                                 mime_type, file_stat.st_mtime, 0, true);
+                    } else {
+                        cache_put(core_conf->cache_manager, req_path, 
+                                 file_content_for_cache, file_stat.st_size, 
+                                 mime_type, file_stat.st_mtime, 0, false);
+                    }
+                }
+                free(file_content_for_cache);
+            }
+        }
     }
 
     // Log the access entry
@@ -463,4 +621,9 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
     free(buffer_copy);
     free(user_agent);
     free(referer);
+    if (if_none_match) free(if_none_match);
+    if (if_modified_since_str) free(if_modified_since_str);
+    if (cached_response) cache_response_free(cached_response);
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
 } 

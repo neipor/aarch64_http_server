@@ -14,8 +14,11 @@
 #include "log.h"
 #include "util.h"
 #include "proxy.h"
+#include "lb_proxy.h"
 #include "headers.h"
 #include "compress.h"
+#include "cache.h"
+#include "health_api.h"
 
 #define BUFFER_SIZE 4096
 #define TEMP_DEFAULT_PAGE "/index.html"
@@ -110,6 +113,15 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
     char *user_agent = get_user_agent(buffer);
     char *referer = get_referer(buffer);
 
+    // 提取条件请求头部
+    char *if_none_match = extract_header_value(buffer, "If-None-Match");
+    char *if_modified_since_str = extract_header_value(buffer, "If-Modified-Since");
+    time_t if_modified_since = 0;
+    if (if_modified_since_str) {
+        // 简单的时间解析，实际应该使用更完整的HTTP日期解析
+        if_modified_since = atol(if_modified_since_str);
+    }
+
     // Create access log entry
     access_log_entry_t *access_entry = create_access_log_entry();
     if (access_entry) {
@@ -168,6 +180,70 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
         return;
     }
 
+    // 检查是否是健康检查API请求
+    if (strncmp(req_path, "/health", 7) == 0 && core_conf && core_conf->lb_config) {
+        // 提取查询字符串
+        char *query_string = strchr(req_path, '?');
+        if (query_string) {
+            *query_string = '\0';
+            query_string++;
+        }
+        
+        // 解析API请求
+        health_api_request_t *api_request = health_api_parse_request(req_path, method, query_string);
+        if (api_request) {
+            // 处理API请求
+            health_api_response_t *api_response = health_api_handle_request(api_request, core_conf->lb_config);
+            if (api_response) {
+                // 发送API响应
+                char response_header[1024];
+                snprintf(response_header, sizeof(response_header),
+                         "HTTP/1.1 %d %s\r\n"
+                         "Content-Type: %s\r\n"
+                         "Content-Length: %zu\r\n"
+                         "Connection: close\r\n"
+                         "X-Powered-By: ANX-HealthCheck/1.0\r\n"
+                         "\r\n",
+                         api_response->status_code,
+                         api_response->status_code == 200 ? "OK" : "Error",
+                         api_response->content_type ? api_response->content_type : "application/json",
+                         api_response->body_size);
+                
+                send(client_socket, response_header, strlen(response_header), 0);
+                if (api_response->body) {
+                    send(client_socket, api_response->body, api_response->body_size, 0);
+                }
+                
+                // 记录访问日志
+                if (access_entry) {
+                    access_entry->status_code = api_response->status_code;
+                    access_entry->response_size = strlen(response_header) + api_response->body_size;
+                    
+                    struct timeval end_time;
+                    gettimeofday(&end_time, NULL);
+                    access_entry->request_duration_ms = 
+                        (end_time.tv_sec - start_time.tv_sec) * 1000.0 +
+                        (end_time.tv_usec - start_time.tv_usec) / 1000.0;
+                    
+                    log_access_entry(access_entry);
+                    free_access_log_entry(access_entry);
+                }
+                
+                health_api_response_free(api_response);
+            }
+            health_api_request_free(api_request);
+        }
+        
+        close(client_socket);
+        free(buffer_copy);
+        free(host);
+        free(user_agent);
+        free(referer);
+        free(if_none_match);
+        free(if_modified_since_str);
+        return;
+    }
+
     char log_msg[BUFFER_SIZE];
     snprintf(log_msg, sizeof(log_msg), "\"%s %s %s\" from %s (Host: %s)", method,
              req_path, http_version, client_ip, host ? host : "none");
@@ -200,6 +276,108 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
         free(user_agent);
         free(referer);
         return;
+    }
+
+    // 检查缓存
+    cache_response_t *cached_response = NULL;
+    if (core_conf->cache_manager && method && strcmp(method, "GET") == 0) {
+        cached_response = cache_get(core_conf->cache_manager, req_path, 
+                                   if_none_match, if_modified_since);
+        
+        if (cached_response) {
+            if (cached_response->needs_validation) {
+                // 304 Not Modified
+                const char *response = "HTTP/1.1 304 Not Modified\r\n"
+                                      "Server: ANX HTTP Server/0.6.0\r\n"
+                                      "Connection: close\r\n\r\n";
+                write(client_socket, response, strlen(response));
+                
+                if (access_entry) {
+                    access_entry->status_code = 304;
+                    access_entry->response_size = strlen(response);
+                    
+                    struct timeval end_time;
+                    gettimeofday(&end_time, NULL);
+                    access_entry->request_duration_ms = 
+                        (end_time.tv_sec - start_time.tv_sec) * 1000.0 +
+                        (end_time.tv_usec - start_time.tv_usec) / 1000.0;
+                    
+                    log_access_entry(access_entry);
+                    free_access_log_entry(access_entry);
+                }
+                
+                cache_response_free(cached_response);
+                free(host);
+                free(buffer_copy);
+                free(user_agent);
+                free(referer);
+                if (if_none_match) free(if_none_match);
+                if (if_modified_since_str) free(if_modified_since_str);
+                close(client_socket);
+                return;
+            }
+            
+            if (cached_response->is_cached && cached_response->content) {
+                // 从缓存返回内容
+                const char *mime_type = cached_response->content_type ? 
+                                       cached_response->content_type : "application/octet-stream";
+                
+                char header[BUFFER_SIZE * 2];
+                int header_len = snprintf(header, sizeof(header),
+                         "HTTP/1.1 200 OK\r\n"
+                         "Content-Type: %s\r\n"
+                         "Content-Length: %zu\r\n"
+                         "Server: ANX HTTP Server/0.6.0\r\n"
+                         "X-Cache: HIT\r\n",
+                         mime_type, cached_response->content_length);
+                
+                if (cached_response->etag) {
+                    header_len += snprintf(header + header_len, sizeof(header) - header_len,
+                                          "ETag: %s\r\n", cached_response->etag);
+                }
+                
+                if (cached_response->last_modified > 0) {
+                    header_len += snprintf(header + header_len, sizeof(header) - header_len,
+                                          "Last-Modified: %ld\r\n", cached_response->last_modified);
+                }
+                
+                if (cached_response->is_compressed) {
+                    header_len += snprintf(header + header_len, sizeof(header) - header_len,
+                                          "Content-Encoding: gzip\r\n"
+                                          "Vary: Accept-Encoding\r\n");
+                }
+                
+                header_len += snprintf(header + header_len, sizeof(header) - header_len,
+                                      "Connection: close\r\n\r\n");
+                
+                write(client_socket, header, strlen(header));
+                write(client_socket, cached_response->content, cached_response->content_length);
+                
+                if (access_entry) {
+                    access_entry->status_code = 200;
+                    access_entry->response_size = strlen(header) + cached_response->content_length;
+                    
+                    struct timeval end_time;
+                    gettimeofday(&end_time, NULL);
+                    access_entry->request_duration_ms = 
+                        (end_time.tv_sec - start_time.tv_sec) * 1000.0 +
+                        (end_time.tv_usec - start_time.tv_usec) / 1000.0;
+                    
+                    log_access_entry(access_entry);
+                    free_access_log_entry(access_entry);
+                }
+                
+                cache_response_free(cached_response);
+                free(host);
+                free(buffer_copy);
+                free(user_agent);
+                free(referer);
+                if (if_none_match) free(if_none_match);
+                if (if_modified_since_str) free(if_modified_since_str);
+                close(client_socket);
+                return;
+            }
+        }
     }
 
     // --- Routing ---
@@ -253,8 +431,21 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
     // 如果配置了proxy_pass，执行反向代理
     if (proxy_pass) {
         char *headers = extract_headers(buffer);
-        int result = handle_proxy_request(client_socket, method, req_path, http_version, 
+        int result = -1;
+        
+        // 检查是否为upstream代理
+        if (is_upstream_proxy(proxy_pass)) {
+            char *upstream_name = extract_upstream_name(proxy_pass);
+            if (upstream_name) {
+                result = handle_lb_proxy_request(client_socket, method, req_path, http_version, 
+                                               headers, upstream_name, client_ip, core_conf);
+                free(upstream_name);
+            }
+        } else {
+            // 传统的直接代理
+            result = handle_proxy_request(client_socket, method, req_path, http_version, 
                                          headers, proxy_pass, client_ip);
+        }
         
         if (access_entry) {
             free(access_entry->upstream_addr);
@@ -427,6 +618,8 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
         }
     }
     
+
+
     // 构建响应头
     char header[BUFFER_SIZE * 2];
     int header_len = snprintf(header, sizeof(header),
@@ -478,6 +671,32 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
         sendfile(client_socket, file_fd, NULL, file_stat.st_size);
     }
     
+    // 将内容添加到缓存
+    if (core_conf->cache_manager && method && strcmp(method, "GET") == 0 && 
+        status_code == 200 && file_stat.st_size > 0) {
+        
+        if (cache_config_is_cacheable(core_conf->raw_config->cache, mime_type, file_stat.st_size)) {
+            // 读取文件内容用于缓存
+            char *file_content_for_cache = malloc(file_stat.st_size);
+            if (file_content_for_cache) {
+                lseek(file_fd, 0, SEEK_SET);
+                if (read(file_fd, file_content_for_cache, file_stat.st_size) == file_stat.st_size) {
+                    // 存储到缓存（如果已压缩则存储压缩版本）
+                    if (should_compress && compressed_data) {
+                        cache_put(core_conf->cache_manager, req_path, 
+                                 (char *)compressed_data, compressed_size, 
+                                 mime_type, file_stat.st_mtime, 0, true);
+                    } else {
+                        cache_put(core_conf->cache_manager, req_path, 
+                                 file_content_for_cache, file_stat.st_size, 
+                                 mime_type, file_stat.st_mtime, 0, false);
+                    }
+                }
+                free(file_content_for_cache);
+            }
+        }
+    }
+    
     // 清理资源
     if (compress_ctx) {
         compress_context_free(compress_ctx);
@@ -507,5 +726,8 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
     free(buffer_copy);
     free(user_agent);
     free(referer);
+    if (if_none_match) free(if_none_match);
+    if (if_modified_since_str) free(if_modified_since_str);
+    if (cached_response) cache_response_free(cached_response);
     close(client_socket);
 } 

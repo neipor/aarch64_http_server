@@ -1,0 +1,35 @@
+# 请直接复制以下命令到终端执行：
+
+# 首先，检查当前状态
+pwd && git status && git branch --show-current
+
+# 然后，一键执行所有清理命令（复制整个块）
+{
+echo "开始Git清理..."
+git add -A
+git commit -m "feat: 完成Phase 2.2负载均衡和健康检查功能"
+git tag -d v0.1.0 2>/dev/null
+git tag -d v0.2.0-c-version 2>/dev/null
+git tag -d v0.3.0-epoll 2>/dev/null
+git tag -d v0.4.0-static-files 2>/dev/null
+git tag -d v0.5.0-configurable 2>/dev/null
+git tag -d v0.6.0-multi-process 2>/dev/null
+git tag -a v0.8.0 -m "ANX HTTP Server v0.8.0 - 负载均衡与健康检查"
+git checkout master
+git pull origin master
+git merge feature/phase-1.4-compression --no-ff -m "Merge feature/phase-1.4-compression: 完成Phase 2.2负载均衡功能"
+rm -f test_load_balancer_demo.sh test_cache_demo.sh test_compression_demo.sh test_logging_demo.sh test_headers_demo.sh check_compression.sh check_status.sh
+rm -f PHASE_1_3_SUMMARY.md PHASE_1_4_SUMMARY.md PHASE_2_1_SUMMARY.md PHASE_2_2_SUMMARY.md PROJECT_STATUS_REPORT.md GIT_CLEANUP_GUIDE.md
+git add -A
+git commit -m "cleanup: 删除无用测试文件和临时文档"
+git push origin master
+git push origin --tags
+git branch -d feature/phase-1.4-compression 2>/dev/null
+git push origin --delete feature/phase-1.4-compression 2>/dev/null
+echo "✅ Git清理完成！"
+echo "当前分支: $(git branch --show-current)"
+echo "现有tag: $(git tag -l | tr '\n' ' ')"
+}
+
+# 最后，测试编译
+make clean && make 

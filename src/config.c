@@ -1,6 +1,12 @@
+// 定义GNU扩展函数
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "config.h"
 #include "log.h"
 #include "compress.h"
+#include "health_check.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -113,6 +119,123 @@ static http_block_t *parse_http_block(int *token_idx);
 static server_block_t *parse_server_block(int *token_idx);
 static location_block_t *parse_location_block(int *token_idx);
 static directive_t parse_directive(int *token_idx);
+static upstream_block_t *parse_upstream_block(int *token_idx);
+
+static upstream_block_t *parse_upstream_block(int *token_idx) {
+  if (strcmp(tokens[*token_idx], "upstream") != 0) {
+    log_message(LOG_LEVEL_ERROR, "Expected 'upstream' keyword.");
+    return NULL;
+  }
+  *token_idx += 1;  // Consume 'upstream'
+  
+  if (*token_idx >= token_count) {
+    log_message(LOG_LEVEL_ERROR, "Expected upstream name after 'upstream'.");
+    return NULL;
+  }
+  
+  char *upstream_name = strdup(tokens[*token_idx]);
+  *token_idx += 1;  // Consume upstream name
+  
+  if (*token_idx >= token_count || strcmp(tokens[*token_idx], "{") != 0) {
+    log_message(LOG_LEVEL_ERROR, "Expected '{' after upstream name.");
+    free(upstream_name);
+    return NULL;
+  }
+  *token_idx += 1;  // Consume '{'
+  
+  upstream_block_t *upstream = calloc(1, sizeof(upstream_block_t));
+  upstream->name = upstream_name;
+  upstream->directives = NULL;
+  upstream->directive_count = 0;
+  upstream->servers = NULL;
+  
+  while (*token_idx < token_count && strcmp(tokens[*token_idx], "}") != 0) {
+    if (strcmp(tokens[*token_idx], "server") == 0) {
+      // Parse server directive: server 192.168.1.100:8080 weight=3 max_fails=3 fail_timeout=30s;
+      *token_idx += 1;  // Consume 'server'
+      
+      if (*token_idx >= token_count) {
+        log_message(LOG_LEVEL_ERROR, "Expected server address after 'server'.");
+        break;
+      }
+      
+      upstream_server_entry_t *server_entry = calloc(1, sizeof(upstream_server_entry_t));
+      
+      // Parse server address (host:port)
+      char *server_addr = strdup(tokens[*token_idx]);
+      char *colon = strchr(server_addr, ':');
+      if (colon) {
+        *colon = '\0';
+        server_entry->host = strdup(server_addr);
+        server_entry->port = atoi(colon + 1);
+      } else {
+        server_entry->host = strdup(server_addr);
+        server_entry->port = 80;  // Default port
+      }
+      free(server_addr);
+      
+      // Set default values
+      server_entry->weight = 1;
+      server_entry->max_fails = 3;
+      server_entry->fail_timeout = 30;
+      server_entry->max_conns = 1000;
+      
+      *token_idx += 1;  // Consume server address
+      
+      // Parse optional parameters
+      while (*token_idx < token_count && strcmp(tokens[*token_idx], ";") != 0) {
+        char *param = tokens[*token_idx];
+        if (strncmp(param, "weight=", 7) == 0) {
+          server_entry->weight = atoi(param + 7);
+        } else if (strncmp(param, "max_fails=", 10) == 0) {
+          server_entry->max_fails = atoi(param + 10);
+        } else if (strncmp(param, "fail_timeout=", 13) == 0) {
+          char *timeout_str = param + 13;
+          server_entry->fail_timeout = atoi(timeout_str);
+          // Handle 's' suffix for seconds
+          if (timeout_str[strlen(timeout_str) - 1] == 's') {
+            // Already in seconds
+          }
+        } else if (strncmp(param, "max_conns=", 10) == 0) {
+          server_entry->max_conns = atoi(param + 10);
+        }
+        *token_idx += 1;
+      }
+      
+      if (*token_idx < token_count && strcmp(tokens[*token_idx], ";") == 0) {
+        *token_idx += 1;  // Consume ';'
+      }
+      
+      // Add server to upstream
+      server_entry->next = upstream->servers;
+      upstream->servers = server_entry;
+      
+      char log_msg[256];
+      snprintf(log_msg, sizeof(log_msg), "Parsed upstream server: %s:%d (weight=%d)", 
+               server_entry->host, server_entry->port, server_entry->weight);
+      log_message(LOG_LEVEL_DEBUG, log_msg);
+      
+    } else {
+      // It's a directive
+      upstream->directive_count++;
+      upstream->directives = realloc(upstream->directives, 
+                                   sizeof(directive_t) * upstream->directive_count);
+      upstream->directives[upstream->directive_count - 1] = parse_directive(token_idx);
+    }
+  }
+  
+  if (*token_idx >= token_count || strcmp(tokens[*token_idx], "}") != 0) {
+    log_message(LOG_LEVEL_ERROR, "Upstream block not closed with '}'.");
+  } else {
+    *token_idx += 1;  // Consume '}'
+  }
+  
+  char log_msg[256];
+  snprintf(log_msg, sizeof(log_msg), "Parsed upstream block: %s", upstream->name);
+  log_message(LOG_LEVEL_INFO, log_msg);
+  
+  return upstream;
+}
 
 static directive_t parse_directive(int *token_idx) {
   directive_t dir = {0};
@@ -233,12 +356,19 @@ static http_block_t *parse_http_block(int *token_idx) {
   http->directives = NULL;
   http->directive_count = 0;
   http->servers = NULL;
+  http->upstreams = NULL;
 
   while (*token_idx < token_count && strcmp(tokens[*token_idx], "}") != 0) {
     if (strcmp(tokens[*token_idx], "server") == 0) {
       server_block_t* srv = parse_server_block(token_idx);
       srv->next = http->servers;
       http->servers = srv;
+    } else if (strcmp(tokens[*token_idx], "upstream") == 0) {
+      upstream_block_t* ups = parse_upstream_block(token_idx);
+      if (ups) {
+        ups->next = http->upstreams;
+        http->upstreams = ups;
+      }
     } else {
       // It's a directive
       http->directive_count++;
@@ -304,6 +434,15 @@ config_t *parse_config(const char *filename) {
         return NULL;
     }
     
+    // 初始化缓存配置
+    new_config->cache = cache_config_create();
+    if (!new_config->cache) {
+        log_message(LOG_LEVEL_ERROR, "Failed to create cache config");
+        compress_config_free(new_config->compress);
+        free(new_config);
+        return NULL;
+    }
+    
     int token_idx = 0;
     while (token_idx < token_count) {
         if (strcmp(tokens[token_idx], "http") == 0) {
@@ -315,12 +454,14 @@ config_t *parse_config(const char *filename) {
         }
     }
     
-    // 处理HTTP块中的压缩指令
+    // 处理HTTP块中的压缩和缓存指令
     if (new_config->http) {
         for (int i = 0; i < new_config->http->directive_count; i++) {
             const directive_t *dir = &new_config->http->directives[i];
             if (strncmp(dir->key, "gzip", 4) == 0) {
                 handle_compression_directive(new_config, dir->key, dir->value);
+            } else if (strncmp(dir->key, "proxy_cache", 11) == 0) {
+                handle_cache_directive(new_config, dir->key, dir->value);
             }
         }
     }
@@ -399,6 +540,31 @@ static void free_server_block(server_block_t *srv) {
     free(srv);
 }
 
+static void free_upstream_server_entry(upstream_server_entry_t *entry) {
+    if (!entry) return;
+    free(entry->host);
+    if (entry->next) {
+        free_upstream_server_entry(entry->next);
+    }
+    free(entry);
+}
+
+static void free_upstream_block(upstream_block_t *upstream) {
+    if (!upstream) return;
+    free(upstream->name);
+    for (int i = 0; i < upstream->directive_count; i++) {
+        free_directive(&upstream->directives[i]);
+    }
+    free(upstream->directives);
+    if (upstream->servers) {
+        free_upstream_server_entry(upstream->servers);
+    }
+    if (upstream->next) {
+        free_upstream_block(upstream->next);
+    }
+    free(upstream);
+}
+
 static void free_http_block(http_block_t *http) {
     if (!http) return;
     for (int i = 0; i < http->directive_count; i++) {
@@ -406,6 +572,9 @@ static void free_http_block(http_block_t *http) {
     }
     free(http->directives);
     free_server_block(http->servers);
+    if (http->upstreams) {
+        free_upstream_block(http->upstreams);
+    }
     free(http);
 }
 
@@ -414,6 +583,9 @@ void free_config(config_t *config) {
   free_http_block(config->http);
   if (config->compress) {
     compress_config_free(config->compress);
+  }
+  if (config->cache) {
+    cache_config_free(config->cache);
   }
   free(config);
 }
@@ -501,6 +673,10 @@ log_config_t *extract_log_config(const config_t *config) {
             log_config->error_log_level = LOG_LEVEL_INFO;
         } else if (strcmp(log_level, "debug") == 0) {
             log_config->error_log_level = LOG_LEVEL_DEBUG;
+        } else {
+            char log_msg[128];
+            snprintf(log_msg, sizeof(log_msg), "Unknown log level: %s", log_level);
+            log_message(LOG_LEVEL_WARNING, log_msg);
         }
     }
     
@@ -579,45 +755,184 @@ int handle_compression_directive(config_t *config, const char *directive, const 
     return 0;
 }
 
-// 初始化配置
-config_t *config_create(void) {
-    config_t *config = calloc(1, sizeof(config_t));
-    if (!config) {
-        return NULL;
+// 处理缓存配置指令
+int handle_cache_directive(config_t *config, const char *directive, const char *value) {
+    if (!config || !config->cache) {
+        return -1;
     }
     
-    // 初始化压缩配置
-    config->compress = compress_config_create();
-    if (!config->compress) {
-        free(config);
-        return NULL;
+    if (strcmp(directive, "proxy_cache") == 0) {
+        config->cache->enable_cache = (strcmp(value, "on") == 0);
+    }
+    else if (strcmp(directive, "proxy_cache_max_size") == 0) {
+        char *endptr;
+        long size = strtol(value, &endptr, 10);
+        if (*endptr == 'm' || *endptr == 'M') {
+            size *= 1024 * 1024;
+        } else if (*endptr == 'k' || *endptr == 'K') {
+            size *= 1024;
+        }
+        if (size > 0) {
+            config->cache->max_size = size;
+        }
+    }
+    else if (strcmp(directive, "proxy_cache_max_entries") == 0) {
+        int entries = atoi(value);
+        if (entries > 0) {
+            config->cache->max_entries = entries;
+        }
+    }
+    else if (strcmp(directive, "proxy_cache_ttl") == 0) {
+        int ttl = atoi(value);
+        if (ttl > 0) {
+            config->cache->default_ttl = ttl;
+        }
+    }
+    else if (strcmp(directive, "proxy_cache_strategy") == 0) {
+        if (strcmp(value, "lru") == 0) {
+            config->cache->strategy = CACHE_STRATEGY_LRU;
+        } else if (strcmp(value, "lfu") == 0) {
+            config->cache->strategy = CACHE_STRATEGY_LFU;
+        } else if (strcmp(value, "fifo") == 0) {
+            config->cache->strategy = CACHE_STRATEGY_FIFO;
+        }
+    }
+    else if (strcmp(directive, "proxy_cache_types") == 0) {
+        // 清除现有类型
+        for (int i = 0; i < config->cache->cacheable_types_count; i++) {
+            free(config->cache->cacheable_types[i]);
+        }
+        config->cache->cacheable_types_count = 0;
+        
+        // 解析新的类型列表
+        char *types = strdup(value);
+        char *type = strtok(types, " ");
+        while (type) {
+            cache_config_add_type(config->cache, type);
+            type = strtok(NULL, " ");
+        }
+        free(types);
+    }
+    else if (strcmp(directive, "proxy_cache_min_size") == 0) {
+        char *endptr;
+        long size = strtol(value, &endptr, 10);
+        if (*endptr == 'k' || *endptr == 'K') {
+            size *= 1024;
+        }
+        if (size > 0) {
+            config->cache->min_file_size = size;
+        }
+    }
+    else if (strcmp(directive, "proxy_cache_max_file_size") == 0) {
+        char *endptr;
+        long size = strtol(value, &endptr, 10);
+        if (*endptr == 'm' || *endptr == 'M') {
+            size *= 1024 * 1024;
+        } else if (*endptr == 'k' || *endptr == 'K') {
+            size *= 1024;
+        }
+        if (size > 0) {
+            config->cache->max_file_size = size;
+        }
+    }
+    else if (strcmp(directive, "proxy_cache_etag") == 0) {
+        config->cache->enable_etag = (strcmp(value, "on") == 0);
+    }
+    else if (strcmp(directive, "proxy_cache_last_modified") == 0) {
+        config->cache->enable_last_modified = (strcmp(value, "on") == 0);
     }
     
-    // ... existing initialization code ...
-    
-    return config;
-}
-
-// 释放配置
-void config_free(config_t *config) {
-    if (!config) return;
-    
-    // 释放压缩配置
-    if (config->compress) {
-        compress_config_free(config->compress);
-    }
-    
-    // ... existing cleanup code ...
-    
-    free(config);
+    return 0;
 }
 
 // 处理配置指令
 int handle_config_directive(config_t *config, const char *directive, const char *value) {
-    // 处理压缩相关指令
-    if (strncmp(directive, "gzip", 4) == 0) {
-        return handle_compression_directive(config, directive, value);
+    if (strcmp(directive, "worker_processes") == 0) {
+        config->worker_processes = atoi(value);
+        return 0;
+    }
+    if (strcmp(directive, "error_log") == 0) {
+        config->error_log = strdup(value);
+        return 0;
+    }
+    if (strcmp(directive, "access_log") == 0) {
+        config->access_log = strdup(value);
+        return 0;
+    }
+    if (strcmp(directive, "log_level") == 0) {
+        if (strcmp(value, "debug") == 0) {
+            config->log_level = LOG_LEVEL_DEBUG;
+        } else if (strcmp(value, "info") == 0) {
+            config->log_level = LOG_LEVEL_INFO;
+        } else if (strcmp(value, "warning") == 0) {
+            config->log_level = LOG_LEVEL_WARNING;
+        } else if (strcmp(value, "error") == 0) {
+            config->log_level = LOG_LEVEL_ERROR;
+        } else {
+            char log_msg[128];
+            snprintf(log_msg, sizeof(log_msg), "Unknown log level: %s", value);
+            log_message(LOG_LEVEL_WARNING, log_msg);
+        }
+        return 0;
+    }
+    return -1;
+}
+
+// 健康检查配置解析函数
+health_check_config_t *parse_health_check_config(const directive_t *directives, int count) {
+    if (!directives || count == 0) return NULL;
+    
+    health_check_config_t *config = health_check_config_create();
+    if (!config) return NULL;
+    
+    for (int i = 0; i < count; i++) {
+        const char *key = directives[i].key;
+        const char *value = directives[i].value;
+        
+        if (strcmp(key, "health_check") == 0) {
+            config->enabled = (strcmp(value, "on") == 0 || strcmp(value, "true") == 0);
+        } else if (strcmp(key, "health_check_uri") == 0) {
+            health_check_config_set_uri(config, value);
+        } else if (strcmp(key, "health_check_method") == 0) {
+            health_check_config_set_method(config, value);
+        } else if (strcmp(key, "health_check_interval") == 0) {
+            config->interval = atoi(value);
+        } else if (strcmp(key, "health_check_timeout") == 0) {
+            config->timeout = atoi(value);
+        } else if (strcmp(key, "health_check_retries") == 0) {
+            config->retries = atoi(value);
+        } else if (strcmp(key, "health_check_rise") == 0) {
+            config->rise = atoi(value);
+        } else if (strcmp(key, "health_check_fall") == 0) {
+            config->fall = atoi(value);
+        } else if (strcmp(key, "health_check_type") == 0) {
+            if (strcmp(value, "http") == 0) {
+                config->type = HEALTH_CHECK_HTTP;
+            } else if (strcmp(value, "https") == 0) {
+                config->type = HEALTH_CHECK_HTTPS;
+            } else if (strcmp(value, "tcp") == 0) {
+                config->type = HEALTH_CHECK_TCP;
+            } else if (strcmp(value, "ping") == 0) {
+                config->type = HEALTH_CHECK_PING;
+            } else {
+                char log_msg[128];
+                snprintf(log_msg, sizeof(log_msg), "Unknown health check type: %s", value);
+                log_message(LOG_LEVEL_WARNING, log_msg);
+            }
+        } else if (strcmp(key, "health_check_expected_response") == 0) {
+            health_check_config_set_expected_response(config, value);
+        } else if (strcmp(key, "health_check_headers") == 0) {
+            health_check_config_set_headers(config, value);
+        } else if (strcmp(key, "health_check_port") == 0) {
+            config->port = atoi(value);
+        }
     }
     
-    return 0;
+    return config;
+}
+
+void free_health_check_config(health_check_config_t *config) {
+    if (config) {
+        health_check_config_free(config);
+    }
 } 
