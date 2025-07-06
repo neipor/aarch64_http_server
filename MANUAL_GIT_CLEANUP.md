@@ -105,7 +105,26 @@ rm -f check_compression.sh
 rm -f check_status.sh
 ```
 
-## 步骤8：删除临时文档
+## 步骤8：删除Docker文件
+```bash
+# 删除Docker相关文件
+rm -f Dockerfile
+rm -f Dockerfile.dev
+rm -f .dockerignore
+```
+
+## 步骤9：删除临时配置和目录
+```bash
+# 删除临时配置文件
+rm -f anx.conf
+
+# 删除临时目录
+rm -rf config/
+rm -rf certs/
+rm -rf tests/
+```
+
+## 步骤10：删除临时文档
 ```bash
 # 删除临时文档（如果存在）
 rm -f PHASE_1_3_SUMMARY.md
@@ -116,21 +135,23 @@ rm -f PROJECT_STATUS_REPORT.md
 rm -f GIT_CLEANUP_GUIDE.md
 ```
 
-## 步骤9：提交删除操作
+## 步骤11：提交删除操作
 ```bash
 # 添加删除操作
 git add -A
 
 # 提交
-git commit -m "cleanup: 删除无用测试文件和临时文档
+git commit -m "cleanup: 删除无用测试文件、Docker文件、临时配置和文档
 
 - 删除测试脚本文件
+- 删除Docker文件
+- 删除临时配置和目录
 - 删除临时文档文件
 - 清理项目结构
 - 为正式发布做准备"
 ```
 
-## 步骤10：推送到远程
+## 步骤12：推送到远程
 ```bash
 # 推送master分支
 git push origin master
@@ -139,7 +160,7 @@ git push origin master
 git push origin --tags
 ```
 
-## 步骤11：删除已合并的分支
+## 步骤13：删除已合并的分支
 ```bash
 # 删除本地分支
 git branch -d feature/phase-1.4-compression
@@ -148,7 +169,7 @@ git branch -d feature/phase-1.4-compression
 git push origin --delete feature/phase-1.4-compression
 ```
 
-## 步骤12：验证结果
+## 步骤14：验证结果
 ```bash
 # 检查当前分支
 git branch --show-current
@@ -163,7 +184,7 @@ git log --oneline -5
 ls -la
 ```
 
-## 步骤13：测试编译
+## 步骤15：测试编译
 ```bash
 # 清理并编译
 make clean && make
@@ -186,4 +207,6 @@ make clean && make
 - 在master分支上
 - 有清晰的tag体系（v0.8.0）
 - 删除了无用的测试文件
+- 删除了Docker文件
+- 删除了临时配置和目录
 - 准备好开始Phase 2.3 

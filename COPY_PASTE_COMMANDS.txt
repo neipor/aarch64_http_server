@@ -19,9 +19,12 @@ git checkout master
 git pull origin master
 git merge feature/phase-1.4-compression --no-ff -m "Merge feature/phase-1.4-compression: 完成Phase 2.2负载均衡功能"
 rm -f test_load_balancer_demo.sh test_cache_demo.sh test_compression_demo.sh test_logging_demo.sh test_headers_demo.sh check_compression.sh check_status.sh
+rm -f Dockerfile Dockerfile.dev .dockerignore
+rm -f anx.conf
+rm -rf config/ certs/ tests/
 rm -f PHASE_1_3_SUMMARY.md PHASE_1_4_SUMMARY.md PHASE_2_1_SUMMARY.md PHASE_2_2_SUMMARY.md PROJECT_STATUS_REPORT.md GIT_CLEANUP_GUIDE.md
 git add -A
-git commit -m "cleanup: 删除无用测试文件和临时文档"
+git commit -m "cleanup: 删除无用测试文件、Docker文件、临时配置和文档"
 git push origin master
 git push origin --tags
 git branch -d feature/phase-1.4-compression 2>/dev/null

@@ -40,20 +40,31 @@ git merge feature/phase-1.4-compression --no-ff -m "Merge feature/phase-1.4-comp
 echo "6. 删除测试文件..."
 rm -f test_load_balancer_demo.sh test_cache_demo.sh test_compression_demo.sh test_logging_demo.sh test_headers_demo.sh check_compression.sh check_status.sh
 
+# 删除Docker文件
+echo "7. 删除Docker文件..."
+rm -f Dockerfile Dockerfile.dev .dockerignore
+
+# 删除临时配置文件
+echo "8. 删除临时配置文件..."
+rm -f anx.conf
+rm -rf config/
+rm -rf certs/
+rm -rf tests/
+
 # 删除临时文档
-echo "7. 删除临时文档..."
+echo "9. 删除临时文档..."
 rm -f PHASE_1_3_SUMMARY.md PHASE_1_4_SUMMARY.md PHASE_2_1_SUMMARY.md PHASE_2_2_SUMMARY.md PROJECT_STATUS_REPORT.md GIT_CLEANUP_GUIDE.md
 
 # 提交删除操作
-echo "8. 提交删除操作..."
-git add -A && git commit -m "cleanup: 删除无用测试文件和临时文档"
+echo "10. 提交删除操作..."
+git add -A && git commit -m "cleanup: 删除无用测试文件、Docker文件、临时配置和文档"
 
 # 推送到远程
-echo "9. 推送到远程..."
+echo "11. 推送到远程..."
 git push origin master && git push origin --tags
 
 # 删除已合并分支
-echo "10. 删除已合并分支..."
+echo "12. 删除已合并分支..."
 git branch -d feature/phase-1.4-compression 2>/dev/null
 git push origin --delete feature/phase-1.4-compression 2>/dev/null
 
