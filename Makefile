@@ -126,4 +126,7 @@ $(OBJDIR)/cache.o: $(SRCDIR)/cache.c $(SRCDIR)/cache.h $(SRCDIR)/log.h
 $(OBJDIR)/load_balancer.o: $(SRCDIR)/load_balancer.c $(SRCDIR)/load_balancer.h $(SRCDIR)/log.h $(SRCDIR)/health_check.h
 $(OBJDIR)/lb_proxy.o: $(SRCDIR)/lb_proxy.c $(SRCDIR)/lb_proxy.h $(SRCDIR)/load_balancer.h $(SRCDIR)/core.h $(SRCDIR)/log.h
 $(OBJDIR)/health_check.o: $(SRCDIR)/health_check.c $(SRCDIR)/health_check.h $(SRCDIR)/load_balancer.h $(SRCDIR)/log.h
-$(OBJDIR)/health_api.o: $(SRCDIR)/health_api.c $(SRCDIR)/health_api.h $(SRCDIR)/health_check.h $(SRCDIR)/load_balancer.h $(SRCDIR)/log.h 
+$(OBJDIR)/health_api.o: $(SRCDIR)/health_api.c $(SRCDIR)/health_api.h $(SRCDIR)/health_check.h $(SRCDIR)/load_balancer.h $(SRCDIR)/log.h
+$(OBJDIR)/asm_opt.o: $(SRCDIR)/asm_opt.c $(SRCDIR)/asm_opt.h $(SRCDIR)/log.h
+$(OBJDIR)/asm_mempool.o: $(SRCDIR)/asm_mempool.c $(SRCDIR)/asm_mempool.h $(SRCDIR)/asm_opt.h $(SRCDIR)/log.h
+$(OBJDIR)/asm_integration.o: $(SRCDIR)/asm_integration.c $(SRCDIR)/asm_integration.h $(SRCDIR)/asm_opt.h $(SRCDIR)/asm_mempool.h $(SRCDIR)/log.h 
