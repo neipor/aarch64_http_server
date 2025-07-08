@@ -512,12 +512,12 @@ This release represents a complete rewrite and major advancement of the ANX HTTP
   - Proper resource cleanup and memory management
   - Signal handling for graceful shutdown
 - **Comprehensive Testing**
-  - Automated Docker-based testing
+  - Automated testing suite
   - HTTP and HTTPS endpoint validation
   - Timeout protection for hanging tests
   - Container IP-based testing (no port mapping required)
 - **Developer Experience**
-  - Docker development environment
+  - Development environment setup
   - Automated build and test workflows
   - Debug logging with configurable levels
   - Clean modular code structure
@@ -549,7 +549,7 @@ This release represents a complete rewrite and major advancement of the ANX HTTP
 - **Build System**
   - Resolved linking issues with logging functions
   - Fixed header file dependencies
-  - Corrected Docker build processes
+  - Corrected build processes
 
 ### Technical Improvements
 - **Code Quality**
@@ -566,8 +566,8 @@ This release represents a complete rewrite and major advancement of the ANX HTTP
   - Secure memory handling
 
 ### Development Infrastructure
-- **Docker Integration**
-  - Development and production Docker environments
+- **Development Environment**
+- Cross-platform development and testing environments
   - Automated testing with container isolation
   - Easy setup for new contributors
 - **Build System**
@@ -582,7 +582,7 @@ This release represents a complete rewrite and major advancement of the ANX HTTP
 - Basic static file serving
 - Simple configuration file support
 - Multi-process architecture foundation
-- Docker containerization
+- Cross-platform deployment
 - Basic Makefile build system
 
 ### Known Issues in 0.1.0
@@ -655,7 +655,7 @@ This release involved extensive debugging and problem-solving:
 
 2. **Configuration Architecture**: Completely redesigned configuration system to eliminate global variables and improve modularity.
 
-3. **Docker Development**: Established robust Docker-based development and testing workflow.
+3. **Development Environment**: Established robust development and testing workflow.
 
 4. **Path Resolution**: Implemented sophisticated relative path handling for truly portable deployments.
 
@@ -669,7 +669,7 @@ This release involved extensive debugging and problem-solving:
 ### Acknowledgments
 - OpenSSL library for SSL/TLS support
 - Linux epoll for high-performance I/O
-- Docker for containerization support
+- Cross-platform deployment support
 - Nginx for configuration syntax inspiration
 
 ---

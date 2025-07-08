@@ -25,7 +25,7 @@ TARGET = anx
 # 创建构建目录
 $(shell mkdir -p $(OBJDIR))
 
-.PHONY: all clean docker-build-prod docker-run-prod docker-build-dev docker-run-dev test install uninstall check-deps help format
+.PHONY: all clean test install uninstall check-deps help format
 
 all: $(TARGET)
 
@@ -37,22 +37,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Docker commands
-
-# --- Production Build (self-contained image) ---
-docker-build-prod:
-	docker build -t anx-prod-env -f Dockerfile .
-
-docker-run-prod: docker-build-prod
-	docker run -it -p 80:80 -p 443:443 --rm anx-prod-env
-
-# --- Development Workflow (host compile, container run) ---
-docker-build-dev:
-	docker build -t anx-dev-env -f Dockerfile.dev .
-
-# This is the primary development command. It compiles on the host and runs in the container.
-docker-run-dev:
-	docker run -it --rm --name anx-dev-container -v "$(PWD)":/app anx-dev-env
+# Build and test commands
 
 # Automated testing target
 test: $(TARGET)

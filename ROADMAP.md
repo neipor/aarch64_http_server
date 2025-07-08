@@ -102,7 +102,7 @@ ANX is a production-ready HTTP/HTTPS server with advanced Nginx-like functionali
 - **Log management** with rotation and structured error logging (v0.5.0)
 - **Content compression** with gzip and configurable options (v0.6.0)
 - **"Green" deployment** (portable, configurable paths)
-- **Docker containerization** for development and testing
+- **Cross-platform deployment** for development and testing
 - **Automated testing** with comprehensive validation suites
 
 ### 📊 Current Metrics
@@ -270,7 +270,7 @@ ANX is a production-ready HTTP/HTTPS server with advanced Nginx-like functionali
 
 ### Deployment
 - **Cross-platform**: Linux, macOS, FreeBSD support
-- **Packaging**: RPM, DEB, Docker images
+- **Packaging**: RPM, DEB, portable binaries
 - **Configuration migration**: Tools to convert from Nginx configs
 - **Monitoring integration**: Prometheus, Grafana support
 
@@ -309,7 +309,7 @@ ANX is a production-ready HTTP/HTTPS server with advanced Nginx-like functionali
 - **Compiler**: GCC with `-Wall -O2` optimization
 - **Dependencies**: OpenSSL for HTTPS support
 - **Build tool**: Make with automatic dependency tracking
-- **Testing**: Automated Docker-based testing
+- **Testing**: Automated testing suite
 
 ### Development Workflow
 - **Version control**: Git with feature branches
@@ -329,9 +329,9 @@ make clean && make
 # Run tests
 make test
 
-# Development with Docker
-make docker-build-dev
-make docker-run-dev
+# Development Workflow
+make clean && make
+make test
 ```
 
 ---
