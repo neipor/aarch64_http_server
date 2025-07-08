@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "asm_integration.h"
 #include "asm_opt.h"
 #include "asm_mempool.h"
@@ -10,10 +14,6 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <errno.h>
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
 
 // 全局汇编优化状态
 static int asm_integration_initialized = 0;

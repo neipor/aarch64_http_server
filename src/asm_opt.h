@@ -82,4 +82,17 @@ void asm_opt_perf_counter_start(asm_opt_perf_counter_t* counter);
 void asm_opt_perf_counter_stop(asm_opt_perf_counter_t* counter);
 void asm_opt_perf_counter_print(const asm_opt_perf_counter_t* counter);
 
+// 初始化汇编优化模块
+void asm_opt_init(void);
+
+// 高级NEON SIMD优化函数
+void asm_opt_simd_zero_buffer(void* buffer, size_t size);
+uint64_t asm_opt_simd_sum_array(const uint32_t* array, size_t count);
+uint32_t asm_opt_simd_max_array(const uint32_t* array, size_t count);
+int asm_opt_simd_validate_ascii(const char* str, size_t len);
+size_t asm_opt_simd_generate_status_line(char* buffer, size_t buffer_size, 
+                                       int status_code, const char* reason_phrase);
+size_t asm_opt_simd_url_decode(const char* src, size_t src_len, char* dst, size_t dst_len);
+int asm_opt_simd_needs_json_escape(const char* str, size_t len);
+
 #endif // ASM_OPT_H 

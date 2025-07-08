@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "asm_mempool.h"
 #include "asm_opt.h"
 #include "log.h"
