@@ -1,28 +1,55 @@
-# ANX 系统调用参考 (AArch64)
+# ANX HTTP Server - 系统调用参考手册
 
-本文档记录了 ANX 项目中使用的 Linux 系统调用及其在 AArch64 架构下的约定。
+**作者**: neipor  
+**邮箱**: [neitherportal@proton.me](mailto:neitherportal@proton.me)
 
-## 调用约定
+## 1. 概述
 
-- 系统调用号放入 `x8` 寄存器。
-- 参数依次放入 `x0`, `x1`, `x2`, `x3`, `x4`, `x5` 寄存器。
-- 使用 `svc #0` 指令触发系统调用。
-- 返回值通常在 `x0` 寄存器中。
+本文档记录了ANX HTTP Server在Linux (AArch64)平台上运行时，所依赖的关键系统调用。虽然ANX主要使用标准C库函数（如 `printf`, `malloc`, `socket`），但这些库函数最终会调用底层的Linux系统调用来与内核交互。理解这些底层调用有助于性能分析和深度调试。
 
-## 常用系统调用
+---
 
-| 功能 | 系统调用号 | `x0` | `x1` | `x2` | `x3` | `x4` | `x5` |
-|---|---|---|---|---|---|---|---|
-| `read` | 63 | `unsigned int fd` | `char *buf` | `size_t count` | | | |
-| `write` | 64 | `unsigned int fd` | `const char *buf`| `size_t count`| | | |
-| `close` | 57 | `unsigned int fd` | | | | | |
-| `exit` | 93 | `int error_code` | | | | | |
-| `socket` | 198 | `int domain` | `int type` | `int protocol` | | | |
-| `bind` | 200 | `int fd` | `struct sockaddr *umyaddr` | `int addrlen` | | | |
-| `listen` | 201 | `int fd` | `int backlog` | | | | |
-| `accept`| 202 | `int fd` | `struct sockaddr *upeer_sockaddr`| `int *upeer_addrlen`| | | |
-| `epoll_create1`| 291 | `int flags` | | | | | |
-| `epoll_ctl` | 233 | `int epfd` | `int op` | `int fd` | `struct epoll_event *event` | | |
-| `epoll_wait` | 232 | `int epfd` | `struct epoll_event *events` | `int maxevents` | `int timeout` | | |
+## 2. AArch64 系统调用约定
 
-*注：此列表会随着项目进展而更新。* 
+-   **系统调用号**: 存放在 `x8` 寄存器。
+-   **参数传递**: 前6个参数依次放入 `x0` 至 `x5` 寄存器。
+-   **触发**: 使用 `svc #0` (Supervisor Call) 指令陷入内核态。
+-   **返回值**: 存放在 `x0` 寄存器。负值通常表示错误，其绝对值为`errno`。
+
+---
+
+## 3. 关键系统调用列表
+
+下表列出了ANX核心功能所依赖的主要系统调用。
+
+| C库函数 / 功能 | 系统调用 | 调用号 (AArch64) | 主要用途 |
+| :--- | :--- | :--- | :--- |
+| **网络** | | | |
+| `socket()` | `socket` | 198 | 创建一个新的Socket。 |
+| `bind()` | `bind` | 200 | 将Socket绑定到指定IP和端口。 |
+| `listen()` | `listen` | 201 | 开始监听进入的连接。 |
+| `accept()` / `accept4()` | `accept4` | 242 | 接受一个新的客户端连接。 |
+| `send()` / `write()` | `write` | 64 | 发送数据到Socket。 |
+| `recv()` / `read()` | `read` | 63 | 从Socket接收数据。 |
+| `close()` | `close` | 57 | 关闭一个文件描述符。 |
+| **事件驱动** | | | |
+| `epoll_create()` | `epoll_create1` | 20 | 创建一个epoll实例。 |
+| `epoll_ctl()` | `epoll_ctl` | 21 | 添加/修改/删除epoll监听的描述符。|
+| `epoll_wait()` | `epoll_pwait` | 213 | 等待网络事件发生。 |
+| **文件I/O** | | | |
+| `fopen()` / `open()` | `openat` | 56 | 打开一个文件。 |
+| `fread()` / `read()` | `read` | 63 | 从文件读取数据。 |
+| `fwrite()` / `write()`| `write`| 64 | 写入数据到文件。 |
+| `sendfile()` | `sendfile` | 71 | 在两个文件描述符之间零拷贝数据。|
+| `stat()` | `newfstatat` | 79 | 获取文件元数据（如大小、修改时间）。 |
+| **进程管理** | | | |
+| `fork()` | `clone` | 220 | 创建一个新的Worker进程。 |
+| `exit()` / `_exit()`| `exit_group` | 94 | 退出进程。 |
+| `kill()` | `kill` | 129 | 向进程发送信号。 |
+| `waitpid()` | `wait4` | 260 | 等待子进程状态改变。 |
+| **内存管理** | | | |
+| `malloc()` / `free()`| `brk`, `mmap`, `munmap`| 12, 222, 215 | 分配和释放堆内存。 |
+
+---
+
+> 此列表并非详尽无遗，但涵盖了构成ANX服务器核心功能的最重要的系统调用。 
