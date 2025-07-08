@@ -7,8 +7,6 @@
 
 ![C](https://img.shields.io/badge/C-A8B9CC?style=for-the-badge&logo=c&logoColor=white)
 ![Assembly](https://img.shields.io/badge/Assembly-6D84B4?style=for-the-badge&logo=assembly&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![Shell Script](https://img.shields.io/badge/Shell_Script-121011?style=for-the-badge&logo=gnu-bash&logoColor=white)
 ![Makefile](https://img.shields.io/badge/Makefile-427819?style=for-the-badge&logo=gnu&logoColor=white)
 
 ---
@@ -53,7 +51,7 @@
 
 1.  **克隆仓库**:
     ```bash
-    git clone <repository_url>
+    git clone https://github.com/neipor/asm_http_server.git
     cd anx-http-server
     ```
 
@@ -70,22 +68,7 @@
 3.  **运行**:
     ```bash
     ./anx -c /path/to/your/anx.conf
-    ```
-    *默认配置文件位于 `test-configs/anx.conf`*
-
-### Docker环境
-
-项目提供了完整的Docker测试环境，可以轻松在隔离环境中运行和测试。
-
-1.  **启动测试环境**:
-    ```bash
-    docker-compose up --build
-    ```
-
-2.  **运行测试套件**:
-    ```bash
-    ./run-docker-tests.sh
-    ```
+    ``
 
 ## 📜 项目版本历史
 
