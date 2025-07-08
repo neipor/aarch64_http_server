@@ -81,4 +81,105 @@ volumes/
 # Development database files
 *.db
 *.sqlite
-*.sqlite3 
+*.sqlite3
+
+# ==============================================================================
+# Temporary Test Files and Development Scripts
+# ==============================================================================
+
+# Docker testing files
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile.test
+Dockerfile.dev
+.dockerignore.test
+
+# Shell test scripts
+*.sh
+test_*.sh
+run-*.sh
+*-test*.sh
+docker-test-suite.sh
+test_asm_optimizations.sh
+
+# Python test scripts
+*test*.py
+test_*.py
+*_test.py
+test/
+tests/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Test configuration files
+*test*.conf
+test_*.conf
+*-test.conf
+*.test.conf
+
+# Test directories and results
+test-*/
+test_*/
+*test*/
+*-test/
+test-results/
+test-logs/
+test-data/
+test_files/
+temp-*/
+tmp-*/
+
+# Build and compilation test files
+*.build
+build-*/
+build_*/
+compile_test*
+compile-test*
+
+# Benchmark and performance test files
+benchmark_*
+perf_*
+*benchmark*
+*perf*
+
+# Documentation generation files (temporary)
+docs/build/
+docs/_build/
+*.epub
+*.pdf
+site/
+
+# Testing artifacts
+coverage.out
+*.cover
+htmlcov/
+.coverage
+.pytest_cache/
+.tox/
+
+# IDE and development temporary files
+.vscode/tasks.json
+.vscode/launch.json
+.idea/workspace.xml
+.idea/tasks.xml
+
+# Temporary markdown files for testing
+*-temp.md
+*_temp.md
+temp-*.md
+TEMP_*.md
+
+# CI/CD testing files
+.github/workflows/test-*.yml
+.gitlab-ci-test.yml
+travis-test.yml
+circle-test.yml
+
+# Load testing and stress testing
+load_test*
+stress_test*
+*.jmx
+artillery_*
+siege_* 

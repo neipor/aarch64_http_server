@@ -1,4 +1,87 @@
-# ANX HTTP Server Development Roadmap
+# ANX HTTP Server - 项目开发路线图
+
+本路线图规划了ANX HTTP Server的未来发展方向，旨在将其打造为一款功能全面、性能卓越、安全可靠的现代化Web服务器。
+
+**作者**: neipor  
+**邮箱**: [neitherportal@proton.me](mailto:neitherportal@proton.me)
+
+---
+
+## 🎯 总体目标
+
+- **性能**: 成为同类C语言服务器中的性能佼佼者。
+- **功能**: 对标Nginx，提供丰富且实用的功能。
+- **安全**: 提供强大的安全防护机制。
+- **易用**: 保持简单的配置和部署方式。
+
+---
+
+## 🗺️ 版本规划
+
+### 短期目标 (v0.9.0 - v1.0.0) - 性能与稳定性
+
+-   [ ] **性能基准测试框架**:
+    -   [ ] 建立标准化的性能测试场景 (wrk, ab)。
+    -   [ ] 持续追踪关键性能指标 (RPS, 延迟, 内存占用)。
+-   [ ] **稳定性增强**:
+    -   [ ] 完整的单元测试和集成测试覆盖。
+    -   [ ] 引入静态代码分析工具 (Clang Static Analyzer, Cppcheck)。
+    -   [ ] 修复所有已知的内存泄漏和并发问题。
+-   [ ] **HTTPS性能优化**:
+    -   [ ] 利用OpenSSL 3.0新特性，提升TLS握手性能。
+    -   [ ] 实现会话复用 (Session Resumption)。
+-   [ ] **汇编优化扩展**:
+    -   [ ] 支持更多aarch64指令 (如SVE)。
+    -   [ ] 为x86_64架构添加SSE/AVX优化。
+
+### 中期目标 (v1.1.0 - v1.5.0) - 功能完善与生态
+
+-   [ ] **HTTP/2 支持**:
+    -   [ ] 实现HTTP/2协议栈。
+    -   [ ] 支持头部压缩 (HPACK)。
+    -   [ ] 实现服务器推送 (Server Push)。
+-   [ ] **动态模块系统**:
+    -   [ ] 允许在不重新编译服务器的情况下加载功能模块 (.so)。
+    -   [ ] 提供清晰的模块开发API。
+-   [ ] **高级缓存策略**:
+    -   [ ] 引入基于磁盘的持久化缓存。
+    -   [ ] 支持缓存清除 (Cache Purge) API。
+    -   [ ] 实现Stale-while-revalidate和Stale-if-error。
+-   [ ] **WebSockets 支持**:
+    -   [ ] 实现完整的WebSocket协议代理。
+-   [ ] **URL重写与重定向**:
+    -   [ ] 实现强大的URL Rewrite模块，支持正则表达式。
+
+### 长期目标 (v2.0.0+) - 前沿技术与智能化
+
+-   [ ] **HTTP/3 & QUIC 支持**:
+    -   [ ] 集成QUIC协议栈，实现HTTP/3。
+-   [ ] **智能化运维**:
+    -   [ ] 实现基于运行时数据的**自动性能调优**。
+    -   [ ] 集成Prometheus，提供丰富的监控指标。
+-   [ ] **Web应用防火墙 (WAF)**:
+    -   [ ] 开发内置的WAF模块，防御常见Web攻击 (SQL注入, XSS)。
+-   [ ] **脚本语言集成**:
+    -   [ ] 支持嵌入Lua或mruby，实现更灵活的请求处理逻辑。
+-   [ ] **多平台原生支持**:
+    -   [ ] 优化对FreeBSD (kqueue) 和 Windows (IOCP) 的支持。
+
+---
+
+## 📜 已完成里程碑
+
+-   **v0.8.0**: aarch64汇编优化 & 流媒体
+-   **v0.7.0**: 缓存系统
+-   **v0.6.0**: 负载均衡系统
+-   **v0.5.0**: 内容压缩
+-   **v0.4.0**: 访问日志系统 & HTTP头部处理
+-   **v0.3.0**: 反向代理
+-   **v0.2.0**: HTTPS支持 & 多进程架构
+-   **v0.1.0**: 基础HTTP服务器 & epoll事件驱动模型
+
+---
+
+> 该路线图将根据社区反馈和技术发展趋势定期更新。欢迎提出您的宝贵建议！
 
 ## Current Status (v0.6.0)
 
@@ -377,7 +460,7 @@ Build a high-performance, enterprise-level HTTP/HTTPS server with modern Web ser
 - 📋 Check interval configuration
 - 📋 Fault threshold setting
 - 📋 Recovery detection
-- �� Health status API
+- 📋 Health status API
 
 **Expected Completion**: 2024-12-21
 **Technical Points**:
@@ -411,7 +494,7 @@ Build a high-performance, enterprise-level HTTP/HTTPS server with modern Web ser
 - 📋 Request frequency limiting (rate limiting)
 - 📋 Basic DDoS protection
 - 📋 SSL/TLS enhanced configuration
-- �� Automatic security header addition
+- 📋 Automatic security header addition
 - 📋 Request body size limit
 
 **Expected Completion**: 2024-12-25
@@ -425,7 +508,7 @@ Build a high-performance, enterprise-level HTTP/HTTPS server with modern Web ser
 - 📋 Prometheus metric export
 - 📋 Real-time performance monitoring
 - 📋 Custom metrics
-- �� Alerting mechanism
+- 📋 Alerting mechanism
 - 📋 Web management interface
 - 📋 API interface
 - 📋 Charts and dashboards
@@ -443,7 +526,7 @@ Build a high-performance, enterprise-level HTTP/HTTPS server with modern Web ser
 - 📋 Intelligent cache strategy
 - 📋 Cache hierarchy
 - 📋 Cache synchronization
-- �� Persistent cache
+- 📋 Persistent cache
 - 📋 Cache analysis and optimization
 
 **Expected Completion**: 2024-12-30

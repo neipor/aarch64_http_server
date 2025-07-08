@@ -1,177 +1,106 @@
 # ANX HTTP Server
 
-ANX is a high-performance HTTP/HTTPS server written in C, designed to be fast, secure, and feature-rich while maintaining simplicity and ease of use.
+**ANX HTTP Server** 是一款基于C语言从零开发的、高性能、事件驱动的Web服务器。它借鉴了Nginx的设计哲学，采用多进程架构和epoll非阻塞I/O，旨在提供一个轻量级、高并发、功能丰富的Web服务解决方案。
 
-## Features
+**作者**: neipor  
+**邮箱**: [neitherportal@proton.me](mailto:neitherportal@proton.me)
 
-- **HTTP/HTTPS Support**
-  - HTTP/1.1 protocol support
-  - HTTPS with SSL/TLS
-  - Virtual hosts
-  - Location-based routing
+![C](https://img.shields.io/badge/C-A8B9CC?style=for-the-badge&logo=c&logoColor=white)
+![Assembly](https://img.shields.io/badge/Assembly-6D84B4?style=for-the-badge&logo=assembly&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Shell Script](https://img.shields.io/badge/Shell_Script-121011?style=for-the-badge&logo=gnu-bash&logoColor=white)
+![Makefile](https://img.shields.io/badge/Makefile-427819?style=for-the-badge&logo=gnu&logoColor=white)
 
-- **Performance**
-  - Multi-process architecture
-  - Epoll-based event handling
-  - Keep-alive connections
-  - Static file serving optimization
-  - Content compression with gzip
-  - Bandwidth limiting for large files (NEW in v0.8.0)
+---
 
-- **Reverse Proxy & Load Balancing**
-  - Backend connection pooling
-  - Advanced load balancing with 6 algorithms (NEW in v0.8.0)
-  - Upstream health checks
-  - Session persistence
-  - Automatic failover
+## 🚀 核心功能
 
-- **Streaming & Real-time (NEW in v0.8.0)**
-  - Chunked transfer encoding
-  - Server-Sent Events (SSE) push notifications
-  - Stream module for TCP/UDP proxy
-  - Real-time connection management
+- **高性能网络模型**: 
+  - 基于`epoll`的**非阻塞I/O**，支持海量并发连接。
+  - **多进程架构**，充分利用多核CPU性能。
+  - `sendfile()`**零拷贝**技术，高效处理静态文件。
 
-- **Security**
-  - SSL/TLS support
-  - Security headers
-  - Access control
-  - Rate limiting (coming soon)
+- **丰富的功能支持**:
+  - **静态文件服务**：支持MIME类型检测和安全路径检查。
+  - **反向代理**：支持HTTP/HTTPS代理，可配置负载均衡。
+  - **内容压缩**：支持Gzip动态压缩，提升传输效率。
+  - **头部处理**：支持自定义HTTP头部的添加、修改和删除。
+  - **负载均衡**：内置多种负载均衡算法（轮询、IP哈希、最少连接）。
+  - **健康检查**：主动和被动健康检查，自动摘除故障节点。
+  - **流式传输**：支持分块传输编码（Chunked Transfer-Encoding）。
+  - **实时推送**：支持Server-Sent Events (SSE)。
 
-- **Logging & Monitoring**
-  - Access log with multiple formats
-  - Error log with levels
-  - Performance metrics
-  - Log rotation
+- **aarch64汇编优化**:
+  - **NEON SIMD**指令集加速内存操作（`memcpy`, `memset`）。
+  - **CRC32**硬件指令加速哈希计算。
+  - 优化的**字符串处理**和**网络字节序转换**。
+  - 高性能**内存池**，减少系统调用开销。
 
-- **Content Optimization**
-  - Gzip compression
-  - Static file caching
-  - MIME type detection
-  - Conditional requests
+- **高度可配置**:
+  - 类Nginx的**配置文件语法**，支持多`server`和`location`块。
+  - 详细的**日志系统**，支持访问日志和错误日志。
 
-## Installation
+## 🛠️ 快速开始
 
-### Prerequisites
+### 依赖环境
 
-- Linux system (tested on Ubuntu 20.04+)
-- GCC compiler
-- Make build system
-- OpenSSL development libraries
-- zlib development libraries
+- **GCC** (推荐 9.0+)
+- **OpenSSL** (推荐 1.1.1+)
+- **Zlib**
+- **Make**
 
-```bash
-# Install dependencies on Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install gcc make libssl-dev zlib1g-dev
+### 编译与运行
 
-# Clone the repository
-git clone https://github.com/yourusername/anx-http-server.git
-cd anx-http-server
+1.  **克隆仓库**:
+    ```bash
+    git clone <repository_url>
+    cd anx-http-server
+    ```
 
-# Build the server
-make clean && make
+2.  **编译**:
+    - **调试模式**:
+      ```bash
+      make
+      ```
+    - **生产模式 (推荐)**:
+      ```bash
+      make CFLAGS="-O3 -march=native -DNDEBUG"
+      ```
 
-# Run the server
-./anx -c server.conf
-```
+3.  **运行**:
+    ```bash
+    ./anx -c /path/to/your/anx.conf
+    ```
+    *默认配置文件位于 `test-configs/anx.conf`*
 
-## Configuration
+### Docker环境
 
-ANX uses an Nginx-style configuration format. Here's a basic example:
+项目提供了完整的Docker测试环境，可以轻松在隔离环境中运行和测试。
 
-```nginx
-http {
-    # Basic settings
-    workers 4;
-    error_log ./logs/error.log;
-    access_log ./logs/access.log;
-    
-    # Compression settings
-    gzip on;
-    gzip_comp_level 6;
-    gzip_min_length 1024;
-    gzip_types text/plain text/css text/javascript application/javascript 
-              application/json application/xml text/xml application/x-javascript
-              text/html;
-    gzip_vary on;
-    gzip_buffers 32 4k;
-    
-    server {
-        listen 8080;
-        server_name localhost;
-        
-        location / {
-            root ./www;
-        }
-        
-        location /api {
-            proxy_pass http://localhost:3000;
-        }
-    }
-}
-```
+1.  **启动测试环境**:
+    ```bash
+    docker-compose up --build
+    ```
 
-## Testing
+2.  **运行测试套件**:
+    ```bash
+    ./run-docker-tests.sh
+    ```
 
-ANX comes with comprehensive test suites:
+## 📜 项目版本历史
 
-```bash
-# Run all tests
-./run_tests.sh
+- **v0.8.0**: 集成aarch64汇编优化模块，实现流媒体和实时功能。
+- **v0.6.0**: 实现多进程工作模型。
+- **v0.5.0**: 实现类Nginx的配置文件解析器。
+- **v0.4.0**: 实现静态文件服务和反向代理。
+- **v0.3.0**: 引入epoll非阻塞I/O模型。
+- **v0.2.0**: 实现基本的C语言HTTP服务器。
+- **v0.1.0**: 项目初始化，基于汇编的TCP服务器原型。
 
-# Test specific features
-./test_compression_demo.sh  # Test compression
-./test_logging_demo.sh      # Test logging
-./test_headers_demo.sh      # Test headers
-```
+## 🤝 贡献
 
-## Documentation
+欢迎任何形式的贡献！如果您有任何问题或建议，请随时提交Issue或Pull Request。
 
-- [Configuration Guide](docs/configuration.md)
-- [API Documentation](docs/api.md)
-- [Security Guide](docs/security.md)
-- [Performance Tuning](docs/performance.md)
+---
 
-## Version History
-
-- **v0.8.0** - Streaming & Real-time features (2024-12-19)
-  - Chunked transfer encoding support
-  - Bandwidth limiting with token bucket algorithm
-  - Server-Sent Events (SSE) push notifications
-  - Stream module for TCP/UDP load balancing
-  - Real-time connection management
-- **v0.7.0** - Cache system implementation (2024-12-19)
-  - Memory caching with LRU/LFU/FIFO strategies
-  - HTTP caching protocol support (ETag, Last-Modified)
-  - Cache statistics and monitoring
-- **v0.6.0** - Load balancing system (2024-12-19)
-  - Upstream server groups
-  - 6 load balancing algorithms
-  - Health check and automatic failover
-  - Session persistence
-- **v0.5.0** - Content compression support (2025-01-06)
-- **v0.4.0** - Access logging system (2025-01-05)
-- **v0.3.0** - HTTP header manipulation (2025-01-04)
-- **v0.2.0** - Reverse proxy implementation (2025-01-03)
-- **v0.1.0** - Basic HTTP/HTTPS server (2025-01-02)
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- The Nginx project for inspiration
-- The OpenSSL team for SSL/TLS support
-- The zlib team for compression support
-- All our contributors and users
-
-## Contact
-
-- GitHub Issues: [Project Issues](https://github.com/yourusername/anx-http-server/issues)
-- Email: your.email@example.com
-- Twitter: [@ANXServer](https://twitter.com/ANXServer) 
+> 该项目由 **neipor** 开发和维护。 
