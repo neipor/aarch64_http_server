@@ -30,16 +30,18 @@ route_t find_route(const core_config_t *core_conf, const char *host,
     for (int i = 0; i < srv->directive_count; i++) {
       if (strcmp(srv->directives[i].key, "listen") == 0) {
         char *value_copy = strdup(srv->directives[i].value);
-        char *token = strtok(value_copy, " ");
-        int listen_port = token ? atoi(token) : 0;
-        
-        if (listen_port == port) {
-          listens_on_port = true;
-          if (!default_server) {
-            default_server = srv; // First server listening on this port is default
+        if (value_copy) {
+          char *token = strtok(value_copy, " ");
+          int listen_port = token ? atoi(token) : 0;
+          
+          if (listen_port == port) {
+            listens_on_port = true;
+            if (!default_server) {
+              default_server = srv; // First server listening on this port is default
+            }
           }
+          free(value_copy);
         }
-        free(value_copy);
       }
     }
     
@@ -64,7 +66,7 @@ route_t find_route(const core_config_t *core_conf, const char *host,
   route.server = matched_server;
 
   // 2. Find the best matching location block within that server
-  if (matched_server) {
+  if (matched_server && uri) {
     location_block_t *best_match = NULL;
     size_t best_match_len = 0;
 
@@ -74,20 +76,22 @@ route_t find_route(const core_config_t *core_conf, const char *host,
     log_message(LOG_LEVEL_DEBUG, log_msg);
 
     for (location_block_t *loc = matched_server->locations; loc; loc = loc->next) {
-      size_t loc_path_len = strlen(loc->path);
-      snprintf(log_msg, sizeof(log_msg), "DEBUG: Checking location: %s (len=%zu)", loc->path, loc_path_len);
-      log_message(LOG_LEVEL_DEBUG, log_msg);
-      
-      if (strncmp(uri, loc->path, loc_path_len) == 0) {
-        // It's a prefix match. Is it the best one so far?
-        snprintf(log_msg, sizeof(log_msg), "DEBUG: Location %s matches URI %s", loc->path, uri);
+      if (loc->path) {
+        size_t loc_path_len = strlen(loc->path);
+        snprintf(log_msg, sizeof(log_msg), "DEBUG: Checking location: %s (len=%zu)", loc->path, loc_path_len);
         log_message(LOG_LEVEL_DEBUG, log_msg);
         
-        if (loc_path_len > best_match_len) {
-          best_match = loc;
-          best_match_len = loc_path_len;
-          snprintf(log_msg, sizeof(log_msg), "DEBUG: New best match: %s (len=%zu)", loc->path, loc_path_len);
+        if (strncmp(uri, loc->path, loc_path_len) == 0) {
+          // It's a prefix match. Is it the best one so far?
+          snprintf(log_msg, sizeof(log_msg), "DEBUG: Location %s matches URI %s", loc->path, uri);
           log_message(LOG_LEVEL_DEBUG, log_msg);
+          
+          if (loc_path_len > best_match_len) {
+            best_match = loc;
+            best_match_len = loc_path_len;
+            snprintf(log_msg, sizeof(log_msg), "DEBUG: New best match: %s (len=%zu)", loc->path, loc_path_len);
+            log_message(LOG_LEVEL_DEBUG, log_msg);
+          }
         }
       }
     }

@@ -198,6 +198,8 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
         free(host);
         free(user_agent);
         free(referer);
+        if (if_none_match) free(if_none_match);
+        if (if_modified_since_str) free(if_modified_since_str);
         return;
     }
 
@@ -296,6 +298,8 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
         free(host);
         free(user_agent);
         free(referer);
+        if (if_none_match) free(if_none_match);
+        if (if_modified_since_str) free(if_modified_since_str);
         return;
     }
 
@@ -426,6 +430,9 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
         free(buffer_copy);
         free(user_agent);
         free(referer);
+        if (if_none_match) free(if_none_match);
+        if (if_modified_since_str) free(if_modified_since_str);
+        close(client_socket);
         return;
     }
 
@@ -529,8 +536,38 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
 
     char file_path[BUFFER_SIZE];
     if (strcmp(req_path, "/") == 0) {
-        snprintf(file_path, sizeof(file_path), "%s%s", root,
-                 TEMP_DEFAULT_PAGE);
+        // 处理根目录请求，查找index文件
+        const char *index_directive = NULL;
+        if (route.location) {
+            index_directive = get_directive_value("index", route.location->directives, route.location->directive_count);
+        }
+        if (!index_directive && route.server) {
+            index_directive = get_directive_value("index", route.server->directives, route.server->directive_count);
+        }
+        
+        bool index_found = false;
+        if (index_directive) {
+            // 解析index指令，尝试多个文件
+            char *index_copy = strdup(index_directive);
+            char *index_file = strtok(index_copy, " \t");
+            
+            while (index_file && !index_found) {
+                snprintf(file_path, sizeof(file_path), "%s/%s", root, index_file);
+                struct stat temp_stat;
+                if (stat(file_path, &temp_stat) == 0 && S_ISREG(temp_stat.st_mode)) {
+                    index_found = true;
+                }
+                if (!index_found) {
+                    index_file = strtok(NULL, " \t");
+                }
+            }
+            free(index_copy);
+        }
+        
+        if (!index_found) {
+            // 如果没有找到配置的index文件，使用默认的
+            snprintf(file_path, sizeof(file_path), "%s%s", root, TEMP_DEFAULT_PAGE);
+        }
     } else {
         snprintf(file_path, sizeof(file_path), "%s%s", root, req_path);
     }
@@ -578,6 +615,8 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
         free(buffer_copy);
         free(user_agent);
         free(referer);
+        if (if_none_match) free(if_none_match);
+        if (if_modified_since_str) free(if_modified_since_str);
         close(client_socket);
         return;
     }

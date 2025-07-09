@@ -1,0 +1,165 @@
+# ANX HTTP Server - 示例配置文件
+# 这是一个完整的配置示例，展示了ANX服务器的各种功能
+
+# 全局配置
+worker_processes 4;
+error_log ./logs/error.log;
+access_log ./logs/access.log;
+
+# HTTP配置块
+http {
+    # 基础设置
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    
+    # 压缩配置
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1000;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    
+    # 缓存配置
+    proxy_cache_path ./cache levels=1:2 keys_zone=web_cache:10m max_size=1g inactive=60m;
+    
+    # 带宽限制配置
+    enable_bandwidth_limit on;
+    default_rate_limit 1048576;  # 1MB/s
+    default_burst_size 65536;    # 64KB
+    min_file_size 1024;          # 1KB以上文件启用限速
+    
+    # 推送服务配置
+    push_enabled on;
+    push_port 8081;
+    push_max_clients 100;
+    push_heartbeat_interval 30;
+    
+    # 主服务器配置
+    server {
+        listen 8080;
+        server_name localhost;
+        root ./www;
+        index index.html index.htm;
+        
+        # 基础location
+        location / {
+            try_files $uri $uri/ =404;
+        }
+        
+        # 静态资源缓存
+        location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # 大文件下载限速
+        location /downloads {
+            bandwidth_limit 512k;
+            chunked_transfer_encoding on;
+        }
+        
+        # 实时推送端点
+        location /events {
+            push_type sse;
+            push_channel notifications;
+        }
+        
+        # API接口代理
+        location /api {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_cache web_cache;
+            proxy_cache_valid 200 302 10m;
+        }
+        
+        # 健康检查API
+        location /health {
+            health_check_api on;
+            allow 127.0.0.1;
+            deny all;
+        }
+    }
+    
+    # HTTPS服务器配置
+    server {
+        listen 8443 ssl;
+        server_name localhost;
+        root ./www;
+        
+        # SSL证书配置
+        ssl_certificate ./configs/ssl/server.crt;
+        ssl_certificate_key ./configs/ssl/server.key;
+        ssl_session_timeout 1d;
+        ssl_session_cache shared:SSL:50m;
+        ssl_session_tickets off;
+        
+        # 现代SSL配置
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+        ssl_prefer_server_ciphers off;
+        
+        # HSTS
+        add_header Strict-Transport-Security "max-age=63072000" always;
+        
+        location / {
+            try_files $uri $uri/ =404;
+        }
+    }
+    
+    # 负载均衡配置
+    upstream backend {
+        # 基础服务器
+        server 127.0.0.1:3000 weight=3 max_fails=2 fail_timeout=30s;
+        server 127.0.0.1:3001 weight=2 max_fails=2 fail_timeout=30s;
+        server 127.0.0.1:3002 weight=1 backup;
+        
+        # 健康检查配置
+        health_check interval=5s timeout=3s uri=/health;
+        
+        # 负载均衡策略
+        strategy weighted_round_robin;
+    }
+    
+    # 数据库代理upstream
+    upstream database {
+        server 192.168.1.10:5432 weight=2;
+        server 192.168.1.11:5432 weight=1 backup;
+        health_check interval=10s timeout=5s;
+    }
+}
+
+# Stream配置块（TCP/UDP代理）
+stream {
+    # MySQL集群代理
+    upstream mysql_cluster {
+        server 192.168.1.10:3306 weight=2;
+        server 192.168.1.11:3306 weight=1 backup;
+        health_check interval=5s timeout=3s;
+    }
+    
+    # Redis集群代理
+    upstream redis_cluster {
+        server 192.168.1.20:6379 weight=1;
+        server 192.168.1.21:6379 weight=1;
+        strategy least_connections;
+    }
+    
+    # MySQL代理服务器
+    server {
+        listen 3306;
+        proxy_pass mysql_cluster;
+        proxy_timeout 10s;
+        proxy_responses 1;
+    }
+    
+    # Redis代理服务器
+    server {
+        listen 6379;
+        proxy_pass redis_cluster;
+        proxy_timeout 5s;
+    }
+} 

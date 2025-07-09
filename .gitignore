@@ -1,185 +1,199 @@
-# Build artifacts
-/build/
+# Compiled Object files
 *.o
-*.a
+*.obj
+
+# Compiled Dynamic libraries
 *.so
 *.dylib
+*.dll
 
-# Executable files
-/anx
+# Compiled Static libraries
+*.a
+*.la
+*.lo
+
+# Compiled executables
+*.exe
+*.out
 anx
-anx.exe
 
-# SSL Certificates and Keys (自签证书)
-*.crt
+# Generated files
+build/
+*.log
+logs/*.log
+*.core
+*.stackdump
+
+# Backup files
+*~
+*.bak
+*.tmp
+*.swp
+*.swo
+
+# Editor files
+.vscode/
+.DS_Store
+.idea/
+*.sublime-*
+
+# Configuration files (optional)
+# Uncomment these lines if you want to ignore user-specific configs
+# server.conf
+# *.conf
+
+# Test output
+test-results/
+test-logs/
+test_files/test_output/
+
+# Documentation generated files
+docs/html/
+docs/latex/
+
+# Package managers
+node_modules/
+npm-debug.log*
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Coverage files
+*.gcno
+*.gcda
+*.gcov
+coverage/
+
+# Memory debugging files
+valgrind-out.txt
+*.memcheck
+
+# Performance profiling
+gmon.out
+perf.data*
+callgrind.out.*
+
+# SSL/TLS certificates and keys (for security)
 *.key
+*.crt
 *.pem
 *.p12
 *.pfx
-/certs/*.crt
-/certs/*.key
-/certs/*.pem
-
-# Configuration files that might contain secrets
-/config/*.local
-*.local.conf
-*.secret
-
-# Log files
-*.log
-logs/
-/logs/
-
-# Temporary files
-*.tmp
-*.temp
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-
-# Core dumps
-core
-core.*
-
-# Test files and temporary test scripts
-test_*
-temp_*
-*.test
-
-# IDE and editor files
-.vscode/
-.idea/
-*.sublime-*
-.clangd/
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Backup files
-*.bak
-*.backup
-*.orig
-
-# Package files
-*.tar.gz
-*.tgz
-*.zip
-*.rar
-
-# Docker volumes and data
-docker-data/
-volumes/
+ssl/
 
 # Development database files
 *.db
 *.sqlite
 *.sqlite3
 
-# ==============================================================================
-# Temporary Test Files and Development Scripts
-# ==============================================================================
+# Container files
+docker-compose.override.yml
 
-# Docker testing files
-docker-compose.yml
-docker-compose.*.yml
-Dockerfile.test
-Dockerfile.dev
-.dockerignore.test
+# Local environment files
+.env
+.env.local
+.env.*.local
 
-# Shell test scripts
-*.sh
-test_*.sh
-run-*.sh
-*-test*.sh
-docker-test-suite.sh
-test_asm_optimizations.sh
+# Cache files
+.cache/
+*.cache
 
-# Python test scripts
-*test*.py
-test_*.py
-*_test.py
-test/
-tests/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Dependency tracking
+.deps/
 
-# Test configuration files
-*test*.conf
-test_*.conf
-*-test.conf
-*.test.conf
+# Build artifacts
+*.map
+*.lst
 
-# Test directories and results
-test-*/
-test_*/
-*test*/
-*-test/
-test-results/
-test-logs/
-test-data/
-test_files/
-temp-*/
-tmp-*/
+# Man pages
+*.1
+*.3
+*.7
 
-# Build and compilation test files
-*.build
+# Autotools
+autom4te.cache/
+config.guess
+config.log
+config.status
+config.sub
+configure
+install-sh
+ltmain.sh
+missing
+depcomp
+compile
+Makefile.in
+aclocal.m4
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.cmake
+!CMakeLists.txt
+
+# Personal notes
+TODO.txt
+NOTES.txt
+.personal/
+
+# IDE specific files
+tags
+.tags
+TAGS
+.ctags
+.ccls-cache/
+.clangd/
+cscope.*
+
+# Operating system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.Spotlight-V100
+.Trashes
+
+# Temporary build files
+*.i
+*.ii
+*.s
+
+# Additional rules for restructured project
+
+# New build directories
 build-*/
-build_*/
-compile_test*
-compile-test*
+.build/
+dist/
+obj/
 
-# Benchmark and performance test files
-benchmark_*
-perf_*
-*benchmark*
-*perf*
+# Restructured test outputs  
+tests/tmp/
+tests/output/
+*.test
 
-# Documentation generation files (temporary)
+# Documentation build outputs
 docs/build/
-docs/_build/
-*.epub
-*.pdf
-site/
 
-# Testing artifacts
-coverage.out
-*.cover
-htmlcov/
-.coverage
-.pytest_cache/
-.tox/
+# Additional SSL certificate locations
+configs/ssl/*.key
+configs/ssl/*.crt
+configs/ssl/*.pem
 
-# IDE and development temporary files
-.vscode/tasks.json
-.vscode/launch.json
-.idea/workspace.xml
-.idea/tasks.xml
+# Development and debugging outputs
+debug_output.txt
+performance_report.txt
 
-# Temporary markdown files for testing
-*-temp.md
-*_temp.md
-temp-*.md
-TEMP_*.md
+# Keep example configs but ignore actual configs
+!*.conf.example
+!configs/*.example
 
-# CI/CD testing files
-.github/workflows/test-*.yml
-.gitlab-ci-test.yml
-travis-test.yml
-circle-test.yml
-
-# Load testing and stress testing
-load_test*
-stress_test*
-*.jmx
-artillery_*
-siege_* 
+# Temporary test files (as per user rules)
+test_*.sh
+debug_*.sh
+test_*.py
+docker-compose.test.yml
+benchmark_*.log
+refactor_backup/ 

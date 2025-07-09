@@ -1,0 +1,333 @@
+# ANX HTTP Server - Modern Makefile
+# 支持新的模块化目录结构
+
+# ==============================================================================
+# 基础配置
+# ==============================================================================
+
+# 编译器和工具
+CC = gcc
+AR = ar
+STRIP = strip
+
+# 项目名称和版本
+PROJECT_NAME = anx
+VERSION = 0.8.0
+DESCRIPTION = "ANX HTTP Server - High-performance HTTP server with assembly optimizations"
+
+# 目录配置
+SRCDIR = src
+BUILDDIR = build
+OBJDIR = $(BUILDDIR)/objects
+DEBUGDIR = $(BUILDDIR)/debug
+RELEASEDIR = $(BUILDDIR)/release
+TESTDIR = tests
+CONFIGDIR = configs
+DOCDIR = docs
+
+# 模块目录
+CORE_DIR = $(SRCDIR)/core
+HTTP_DIR = $(SRCDIR)/http
+PROXY_DIR = $(SRCDIR)/proxy
+STREAM_DIR = $(SRCDIR)/stream
+UTILS_DIR = $(SRCDIR)/utils
+ASM_DIR = $(UTILS_DIR)/asm
+INCLUDE_DIR = $(SRCDIR)/include
+
+# ==============================================================================
+# 编译选项
+# ==============================================================================
+
+# 基础编译选项
+CFLAGS_BASE = -std=c99 -Wall -Wextra -Werror=implicit-function-declaration
+
+# 包含路径
+INCLUDES = -I$(INCLUDE_DIR) -I$(CORE_DIR) -I$(HTTP_DIR) -I$(PROXY_DIR) \
+           -I$(STREAM_DIR) -I$(UTILS_DIR) -I$(ASM_DIR)
+
+# 链接库
+LIBS = -lssl -lcrypto -lz -lpthread -lm
+
+# 调试模式
+CFLAGS_DEBUG = $(CFLAGS_BASE) -g -O0 -DDEBUG -fsanitize=address -fno-omit-frame-pointer
+LDFLAGS_DEBUG = -fsanitize=address
+
+# 发布模式
+CFLAGS_RELEASE = $(CFLAGS_BASE) -O3 -DNDEBUG -march=native -flto
+LDFLAGS_RELEASE = -flto -s
+
+# 性能分析模式
+CFLAGS_PROFILE = $(CFLAGS_BASE) -O2 -g -pg -DPROFILE
+LDFLAGS_PROFILE = -pg
+
+# 当前模式（默认为调试模式）
+MODE ?= debug
+ifeq ($(MODE),release)
+    CFLAGS = $(CFLAGS_RELEASE)
+    LDFLAGS = $(LDFLAGS_RELEASE)
+    TARGET_DIR = $(RELEASEDIR)
+else ifeq ($(MODE),profile)
+    CFLAGS = $(CFLAGS_PROFILE)
+    LDFLAGS = $(LDFLAGS_PROFILE)
+    TARGET_DIR = $(BUILDDIR)/profile
+else
+    CFLAGS = $(CFLAGS_DEBUG)
+    LDFLAGS = $(LDFLAGS_DEBUG)
+    TARGET_DIR = $(DEBUGDIR)
+endif
+
+# ==============================================================================
+# 源文件发现
+# ==============================================================================
+
+# 核心模块源文件
+CORE_SOURCES = $(wildcard $(CORE_DIR)/*.c)
+CORE_OBJECTS = $(CORE_SOURCES:$(CORE_DIR)/%.c=$(OBJDIR)/core/%.o)
+
+# HTTP模块源文件
+HTTP_SOURCES = $(wildcard $(HTTP_DIR)/*.c)
+HTTP_OBJECTS = $(HTTP_SOURCES:$(HTTP_DIR)/%.c=$(OBJDIR)/http/%.o)
+
+# 代理模块源文件
+PROXY_SOURCES = $(wildcard $(PROXY_DIR)/*.c)
+PROXY_OBJECTS = $(PROXY_SOURCES:$(PROXY_DIR)/%.c=$(OBJDIR)/proxy/%.o)
+
+# 流媒体模块源文件
+STREAM_SOURCES = $(wildcard $(STREAM_DIR)/*.c)
+STREAM_OBJECTS = $(STREAM_SOURCES:$(STREAM_DIR)/%.c=$(OBJDIR)/stream/%.o)
+
+# 工具模块源文件
+UTILS_SOURCES = $(wildcard $(UTILS_DIR)/*.c)
+UTILS_OBJECTS = $(UTILS_SOURCES:$(UTILS_DIR)/%.c=$(OBJDIR)/utils/%.o)
+
+# 汇编优化模块源文件
+ASM_SOURCES = $(wildcard $(ASM_DIR)/*.c)
+ASM_OBJECTS = $(ASM_SOURCES:$(ASM_DIR)/%.c=$(OBJDIR)/asm/%.o)
+
+# 所有对象文件
+ALL_OBJECTS = $(CORE_OBJECTS) $(HTTP_OBJECTS) $(PROXY_OBJECTS) \
+              $(STREAM_OBJECTS) $(UTILS_OBJECTS) $(ASM_OBJECTS)
+
+# 主可执行文件
+TARGET = $(TARGET_DIR)/$(PROJECT_NAME)
+
+# ==============================================================================
+# 构建目标
+# ==============================================================================
+
+.PHONY: all clean debug release profile test install uninstall \
+        format check-syntax help docs package
+
+# 默认目标
+all: $(TARGET)
+
+# 创建必要的目录
+$(OBJDIR) $(TARGET_DIR) $(DEBUGDIR) $(RELEASEDIR):
+	@mkdir -p $@
+	@mkdir -p $(OBJDIR)/{core,http,proxy,stream,utils,asm}
+
+# 主可执行文件
+$(TARGET): $(TARGET_DIR) $(ALL_OBJECTS)
+	@echo "🔗 Linking $(MODE) version..."
+	@$(CC) $(ALL_OBJECTS) -o $@ $(LDFLAGS) $(LIBS)
+	@echo "✅ Build complete: $@"
+
+# 核心模块对象文件
+$(OBJDIR)/core/%.o: $(CORE_DIR)/%.c | $(OBJDIR)
+	@echo "🔨 Compiling $<"
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# HTTP模块对象文件
+$(OBJDIR)/http/%.o: $(HTTP_DIR)/%.c | $(OBJDIR)
+	@echo "🔨 Compiling $<"
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# 代理模块对象文件
+$(OBJDIR)/proxy/%.o: $(PROXY_DIR)/%.c | $(OBJDIR)
+	@echo "🔨 Compiling $<"
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# 流媒体模块对象文件
+$(OBJDIR)/stream/%.o: $(STREAM_DIR)/%.c | $(OBJDIR)
+	@echo "🔨 Compiling $<"
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# 工具模块对象文件
+$(OBJDIR)/utils/%.o: $(UTILS_DIR)/%.c | $(OBJDIR)
+	@echo "🔨 Compiling $<"
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# 汇编优化模块对象文件
+$(OBJDIR)/asm/%.o: $(ASM_DIR)/%.c | $(OBJDIR)
+	@echo "🔨 Compiling $<"
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# ==============================================================================
+# 构建模式目标
+# ==============================================================================
+
+debug:
+	@$(MAKE) MODE=debug all
+	@echo "🐛 Debug build complete: $(DEBUGDIR)/$(PROJECT_NAME)"
+
+release:
+	@$(MAKE) MODE=release all
+	@echo "🚀 Release build complete: $(RELEASEDIR)/$(PROJECT_NAME)"
+
+profile:
+	@$(MAKE) MODE=profile all
+	@echo "📊 Profile build complete: $(BUILDDIR)/profile/$(PROJECT_NAME)"
+
+# ==============================================================================
+# 开发工具
+# ==============================================================================
+
+# 代码格式化
+format:
+	@echo "🎨 Formatting code..."
+	@find $(SRCDIR) -name "*.c" -o -name "*.h" | xargs clang-format -i
+	@echo "✅ Code formatted"
+
+# 语法检查
+check-syntax:
+	@echo "🔍 Checking syntax..."
+	@find $(SRCDIR) -name "*.c" | xargs $(CC) $(CFLAGS) $(INCLUDES) -fsyntax-only
+	@echo "✅ Syntax check complete"
+
+# 静态分析
+analyze:
+	@echo "🔬 Running static analysis..."
+	@find $(SRCDIR) -name "*.c" | xargs cppcheck --enable=all --inconclusive \
+		--std=c99 $(INCLUDES)
+
+# ==============================================================================
+# 测试
+# ==============================================================================
+
+# 构建测试
+test: debug
+	@echo "🧪 Running tests..."
+	@$(MAKE) -C $(TESTDIR) all
+	@echo "✅ All tests passed"
+
+# 单元测试
+unit-test:
+	@echo "🔬 Running unit tests..."
+	@$(MAKE) -C $(TESTDIR) unit
+	
+# 集成测试
+integration-test: debug
+	@echo "🔗 Running integration tests..."
+	@$(MAKE) -C $(TESTDIR) integration
+
+# 性能测试
+benchmark: release
+	@echo "📊 Running benchmarks..."
+	@$(MAKE) -C $(TESTDIR) benchmark
+
+# ==============================================================================
+# 安装和打包
+# ==============================================================================
+
+# 安装
+install: release
+	@echo "📦 Installing $(PROJECT_NAME)..."
+	@sudo cp $(RELEASEDIR)/$(PROJECT_NAME) /usr/local/bin/
+	@sudo chmod +x /usr/local/bin/$(PROJECT_NAME)
+	@sudo mkdir -p /etc/anx
+	@sudo cp $(CONFIGDIR)/anx.conf.example /etc/anx/
+	@echo "✅ Installation complete"
+
+# 卸载
+uninstall:
+	@echo "🗑️  Uninstalling $(PROJECT_NAME)..."
+	@sudo rm -f /usr/local/bin/$(PROJECT_NAME)
+	@sudo rm -rf /etc/anx
+	@echo "✅ Uninstallation complete"
+
+# 打包
+package: release
+	@echo "📦 Creating package..."
+	@mkdir -p dist
+	@tar -czf dist/$(PROJECT_NAME)-$(VERSION).tar.gz \
+		$(RELEASEDIR)/$(PROJECT_NAME) \
+		$(CONFIGDIR)/ \
+		README.md \
+		CHANGELOG.md \
+		ROADMAP.md
+	@echo "✅ Package created: dist/$(PROJECT_NAME)-$(VERSION).tar.gz"
+
+# ==============================================================================
+# 清理
+# ==============================================================================
+
+clean:
+	@echo "🧹 Cleaning build artifacts..."
+	@rm -rf $(BUILDDIR)
+	@rm -f $(PROJECT_NAME)
+	@echo "✅ Clean complete"
+
+clean-all: clean
+	@echo "🧹 Deep cleaning..."
+	@rm -rf dist
+	@$(MAKE) -C $(TESTDIR) clean
+	@echo "✅ Deep clean complete"
+
+# ==============================================================================
+# 帮助和信息
+# ==============================================================================
+
+help:
+	@echo "$(DESCRIPTION)"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  all           - Build default (debug) version"
+	@echo "  debug         - Build debug version"
+	@echo "  release       - Build optimized release version"
+	@echo "  profile       - Build with profiling support"
+	@echo ""
+	@echo "Development:"
+	@echo "  format        - Format source code"
+	@echo "  check-syntax  - Check syntax without building"
+	@echo "  analyze       - Run static analysis"
+	@echo ""
+	@echo "Testing:"
+	@echo "  test          - Run all tests"
+	@echo "  unit-test     - Run unit tests only"
+	@echo "  integration-test - Run integration tests only"
+	@echo "  benchmark     - Run performance benchmarks"
+	@echo ""
+	@echo "Installation:"
+	@echo "  install       - Install to system"
+	@echo "  uninstall     - Remove from system"
+	@echo "  package       - Create distribution package"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  clean         - Remove build artifacts"
+	@echo "  clean-all     - Remove all generated files"
+
+# 项目信息
+info:
+	@echo "Project: $(PROJECT_NAME)"
+	@echo "Version: $(VERSION)"
+	@echo "Description: $(DESCRIPTION)"
+	@echo ""
+	@echo "Source directory: $(SRCDIR)"
+	@echo "Build directory: $(BUILDDIR)"
+	@echo "Current mode: $(MODE)"
+	@echo "Target: $(TARGET)"
+	@echo ""
+	@echo "Compiler: $(CC)"
+	@echo "Flags: $(CFLAGS)"
+	@echo "Libraries: $(LIBS)"
+
+# ==============================================================================
+# 依赖关系
+# ==============================================================================
+
+# 包含自动生成的依赖文件
+-include $(ALL_OBJECTS:.o=.d)
+
+# 生成依赖文件的规则
+$(OBJDIR)/%.d: $(SRCDIR)/%.c
+	@$(CC) $(CFLAGS) $(INCLUDES) -MM -MT $(@:.d=.o) $< > $@ 

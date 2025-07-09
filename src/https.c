@@ -234,10 +234,13 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
         const char *listen_port = get_directive_value("listen", route.server->directives, route.server->directive_count);
         if (listen_port) {
             // Parse port from "443 ssl" format
-            char *port_str = strtok(strdup(listen_port), " ");
-            if (port_str) {
-                access_entry->server_port = atoi(port_str);
-                free(port_str);
+            char *port_copy = strdup(listen_port);
+            if (port_copy) {
+                char *port_str = strtok(port_copy, " ");
+                if (port_str) {
+                    access_entry->server_port = atoi(port_str);
+                }
+                free(port_copy);
             }
         }
     }
@@ -329,8 +332,38 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
 
     char file_path[BUFFER_SIZE];
     if (strcmp(req_path, "/") == 0) {
-        snprintf(file_path, sizeof(file_path), "%s%s", root,
-                 TEMP_DEFAULT_PAGE);
+        // 处理根目录请求，查找index文件
+        const char *index_directive = NULL;
+        if (route.location) {
+            index_directive = get_directive_value("index", route.location->directives, route.location->directive_count);
+        }
+        if (!index_directive && route.server) {
+            index_directive = get_directive_value("index", route.server->directives, route.server->directive_count);
+        }
+        
+        bool index_found = false;
+        if (index_directive) {
+            // 解析index指令，尝试多个文件
+            char *index_copy = strdup(index_directive);
+            char *index_file = strtok(index_copy, " \t");
+            
+            while (index_file && !index_found) {
+                snprintf(file_path, sizeof(file_path), "%s/%s", root, index_file);
+                struct stat temp_stat;
+                if (stat(file_path, &temp_stat) == 0 && S_ISREG(temp_stat.st_mode)) {
+                    index_found = true;
+                }
+                if (!index_found) {
+                    index_file = strtok(NULL, " \t");
+                }
+            }
+            free(index_copy);
+        }
+        
+        if (!index_found) {
+            // 如果没有找到配置的index文件，使用默认的
+            snprintf(file_path, sizeof(file_path), "%s%s", root, TEMP_DEFAULT_PAGE);
+        }
     } else {
         snprintf(file_path, sizeof(file_path), "%s%s", root, req_path);
     }
