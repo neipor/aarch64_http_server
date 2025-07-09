@@ -136,4 +136,15 @@ configs/ssl/*.pem
 
 # Keep example configs but ignore actual configs
 !*.conf.example
-!configs/*.example 
+!configs/*.example # 测试文件和结果
+test_data/
+nginx_config/
+performance_benchmark.sh
+*.log
+*.result
+# 测试文件和结果
+test_data/
+nginx_config/
+performance_benchmark.sh
+*.log
+*.result
