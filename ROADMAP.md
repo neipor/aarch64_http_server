@@ -20,23 +20,17 @@
 
 ## 🗺️ 版本规划
 
-### 短期目标 (v0.9.0 - v1.0.0) - 性能与稳定性
+### 战略调整说明 (2024年7月)
 
--   [ ] **性能基准测试框架**:
-    -   [ ] 建立标准化的性能测试场景 (wrk, ab)。
-    -   [ ] 持续追踪关键性能指标 (RPS, 延迟, 内存占用)。
--   [ ] **稳定性增强**:
-    -   [ ] 完整的单元测试和集成测试覆盖。
-    -   [ ] 引入静态代码分析工具 (Clang Static Analyzer, Cppcheck)。
-    -   [ ] 修复所有已知的内存泄漏和并发问题。
--   [ ] **HTTPS性能优化**:
-    -   [ ] 利用OpenSSL 3.0新特性，提升TLS握手性能。
-    -   [ ] 实现会话复用 (Session Resumption)。
--   [ ] **汇编优化扩展**:
-    -   [ ] 支持更多aarch64指令 (如SVE)。
-    -   [ ] 为x86_64架构添加SSE/AVX优化。
+为了项目的长期健康、安全性和最终的成功，我们做出了一个关键的战略决策：**在实现HTTP/2等新功能之前，优先完成向C/Rust混合架构的演进。**
 
-### 核心目标 (v1.1.0+) - 架构演进：迈向C/Rust混合系统
+我们相信，通过首先用Rust构建一个更安全、更现代化的核心平台，我们可以用更高的质量和更快的速度交付未来的复杂功能（如HTTP/2），从而避免陷入C语言的“技术债泥潭”。这是一个“磨刀不误砍柴工”的战略选择。
+
+因此，当前的路线图将优先聚焦于 **架构演进**。
+
+---
+
+### **当前核心目标 (v1.1.0+) - 架构演进：迈向C/Rust混合系统** 🚧 *进行中*
 
 这是项目下一阶段的**最重要目标**，旨在通过引入Rust来从根本上提升服务器的安全性、稳定性和可维护性，同时保持其顶尖性能。详细计划请参阅 `ARCHITECTURE.md`。
 
@@ -50,44 +44,26 @@
 -   [ ] **阶段三：构建系统升级**
     -   [ ] 引入`cargo`来管理Rust部分，并调整`Makefile`以支持混合编译流程。
 
-### 中期目标 (v1.5.0+) - 功能完善与生态
+### **未来目标 (v2.0.0+) - 新架构上的功能完善**
 
--   [ ] **HTTP/2 支持**:
-    -   [ ] 实现HTTP/2协议栈。
-    -   [ ] 支持头部压缩 (HPACK)。
-    -   [ ] 实现服务器推送 (Server Push)。
--   [ ] **动态模块系统**:
-    -   [ ] 允许在不重新编译服务器的情况下加载功能模块 (.so)。
-    -   [ ] 提供清晰的模块开发API。
--   [ ] **高级缓存策略**:
-    -   [ ] 引入基于磁盘的持久化缓存。
-    -   [ ] 支持缓存清除 (Cache Purge) API。
-    -   [ ] 实现Stale-while-revalidate和Stale-if-error。
--   [ ] **WebSockets 支持**:
-    -   [ ] 实现完整的WebSocket协议代理。
--   [ ] **URL重写与重定向**:
-    -   [ ] 实现强大的URL Rewrite模块，支持正则表达式。
+在混合架构平台稳定后，我们将在此基础上，以更高的效率和质量实现以下功能。
 
-### 长期目标 (v2.0.0+) - 前沿技术与智能化
-
--   [ ] **HTTP/3 & QUIC 支持**:
-    -   [ ] 集成QUIC协议栈，实现HTTP/3。
--   [ ] **智能化运维**:
-    -   [ ] 实现基于运行时数据的**自动性能调优**。
-    -   [ ] 集成Prometheus，提供丰富的监控指标。
--   [ ] **Web应用防火墙 (WAF)**:
-    -   [ ] 开发内置的WAF模块，防御常见Web攻击 (SQL注入, XSS)。
--   [ ] **脚本语言集成**:
-    -   [ ] 支持嵌入Lua或mruby，实现更灵活的请求处理逻辑。
--   [ ] **多平台原生支持**:
-    -   [ ] 优化对FreeBSD (kqueue) 和 Windows (IOCP) 的支持。
+-   [ ] **HTTP/2 支持**
+-   [ ] **WebSockets 支持**
+-   [ ] **HTTP/3 & QUIC 支持**
+-   [ ] **动态模块系统**
+-   [ ] **Web应用防火墙 (WAF)**
+-   [ ] **智能化运维与Prometheus集成**
+-   [ ] **URL重写与重定向**
+-   [ ] **脚本语言集成 (Lua/mruby)**
 
 ---
 
 ## 📜 已完成里程碑
 
+-   **v1.0.0**: 首个正式版发布，项目重命名，文档国际化。
 -   **v0.8.0**: aarch64汇编优化 & 流媒体
--   [ ] **v0.7.0**: 缓存系统
+-   **v0.7.0**: 缓存系统
 -   [ ] **v0.6.0**: 负载均衡系统
 -   [ ] **v0.5.0**: 内容压缩
 -   [ ] **v0.4.0**: 访问日志系统 & HTTP头部处理
@@ -118,23 +94,17 @@ This roadmap outlines the future development direction for anx, aiming to build 
 
 ## 🗺️ Version Planning
 
-### Short-Term Goals (v0.9.0 - v1.0.0) - Performance & Stability
+### Strategic Adjustment Note (July 2024)
 
--   [ ] **Performance Benchmarking Framework**:
-    -   [ ] Establish standardized performance testing scenarios (wrk, ab).
-    -   [ ] Continuously track key performance indicators (RPS, latency, memory usage).
--   [ ] **Stability Enhancements**:
-    -   [ ] Complete unit and integration test coverage.
-    -   [ ] Introduce static code analysis tools (Clang Static Analyzer, Cppcheck).
-    -   [ ] Fix all known memory leaks and concurrency issues.
--   [ ] **HTTPS Performance Optimization**:
-    -   [ ] Leverage new features in OpenSSL 3.0 to improve TLS handshake performance.
-    -   [ ] Implement session resumption.
--   [ ] **Assembly Optimization Expansion**:
-    -   [ ] Support for more aarch64 instructions (e.g., SVE).
-    -   [ ] Add SSE/AVX optimizations for the x86_64 architecture.
+For the long-term health, security, and ultimate success of the project, we have made a critical strategic decision: **Prioritize the evolution to a C/Rust hybrid architecture before implementing new features like HTTP/2.**
 
-### Core Goal (v1.1.0+) - Architectural Evolution: Towards a C/Rust Hybrid System
+We believe that by first building a safer, more modern core platform with Rust, we can deliver future complex features (like HTTP/2) with higher quality and greater velocity, thus avoiding the "technical debt trap" of C. This is a strategic choice to "sharpen the axe before cutting the tree."
+
+Therefore, the current roadmap will focus primarily on **Architectural Evolution**.
+
+---
+
+### **Current Core Goal (v1.1.0+) - Architectural Evolution: Towards a C/Rust Hybrid System** 🚧 *In Progress*
 
 This is the **most critical goal** for the next phase of the project. It aims to fundamentally enhance the server's security, stability, and maintainability by introducing Rust, while retaining its top-tier performance. For a detailed strategy, see `ARCHITECTURE.md`.
 
@@ -148,44 +118,26 @@ This is the **most critical goal** for the next phase of the project. It aims to
 -   [ ] **Phase 3: Build System Upgrade**
     -   [ ] Introduce `cargo` to manage the Rust parts and adapt the `Makefile` to support the hybrid compilation process.
 
-### Mid-Term Goals (v1.5.0+) - Feature Completion & Ecosystem
+### **Future Goals (v2.0.0+) - Feature Completion on the New Architecture**
 
--   [ ] **HTTP/2 Support**:
-    -   [ ] Implement the HTTP/2 protocol stack.
-    -   [ ] Support header compression (HPACK).
-    -   [ ] Implement Server Push.
--   [ ] **Dynamic Module System**:
-    -   [ ] Allow loading functional modules (.so) without recompiling the server.
-    -   [ ] Provide a clear module development API.
--   [ ] **Advanced Caching Strategies**:
-    -   [ ] Introduce disk-based persistent caching.
-    -   [ ] Support a Cache Purge API.
-    -   [ ] Implement Stale-while-revalidate and Stale-if-error.
--   [ ] **WebSockets Support**:
-    -   [ ] Implement a full WebSocket protocol proxy.
--   [ ] **URL Rewriting and Redirection**:
-    -   [ ] Implement a powerful URL Rewrite module with regex support.
+After the hybrid architecture platform is stable, we will implement the following features on this new foundation with greater efficiency and quality.
 
-### Long-Term Goals (v2.0.0+) - Cutting-Edge Technology & Intelligence
-
--   [ ] **HTTP/3 & QUIC Support**:
-    -   [ ] Integrate a QUIC protocol stack to implement HTTP/3.
--   [ ] **Intelligent Operations**:
-    -   [ ] Implement **automatic performance tuning** based on runtime data.
-    -   [ ] Integrate with Prometheus to provide rich monitoring metrics.
--   [ ] **Web Application Firewall (WAF)**:
-    -   [ ] Develop a built-in WAF module to defend against common web attacks (SQL injection, XSS).
--   [ ] **Scripting Language Integration**:
-    -   [ ] Support embedded Lua or mruby for more flexible request handling logic.
--   [ ] **Native Multi-platform Support**:
-    -   [ ] Optimize support for FreeBSD (kqueue) and Windows (IOCP).
+-   [ ] **HTTP/2 Support**
+-   [ ] **WebSockets Support**
+-   [ ] **HTTP/3 & QUIC Support**
+-   [ ] **Dynamic Module System**
+-   [ ] **Web Application Firewall (WAF)**
+-   [ ] **Intelligent Operations & Prometheus Integration**
+-   [ ] **URL Rewriting and Redirection**
+-   [ ] **Scripting Language Integration (Lua/mruby)**
 
 ---
 
 ## 📜 Completed Milestones
 
+-   **v1.0.0**: First official release, project renaming, and documentation internationalization.
 -   **v0.8.0**: AArch64 assembly optimizations & streaming media.
--   [ ] **v0.7.0**: Caching system.
+-   **v0.7.0**: Caching system
 -   [ ] **v0.6.0**: Load balancing system.
 -   [ ] **v0.5.0**: Content compression.
 -   [ ] **v0.4.0**: Access logging system & HTTP header manipulation.
