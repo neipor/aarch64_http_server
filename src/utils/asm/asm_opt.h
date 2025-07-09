@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <sys/types.h>
 
 // 检查是否支持汇编优化
 int asm_opt_is_supported(void);
@@ -74,8 +75,8 @@ uint64_t asm_opt_get_timestamp_ns(void);
 typedef struct {
     uint64_t cycles;
     uint64_t instructions;
-    uint64_t cache_misses;
-    uint64_t branch_misses;
+    uint32_t cache_misses;
+    uint32_t branch_misses;
 } asm_opt_perf_counter_t;
 
 void asm_opt_perf_counter_start(asm_opt_perf_counter_t* counter);
@@ -84,6 +85,36 @@ void asm_opt_perf_counter_print(const asm_opt_perf_counter_t* counter);
 
 // 初始化汇编优化模块
 void asm_opt_init(void);
+
+// HTTP协议专用汇编优化函数
+int asm_opt_fast_http_method_detect(const char* method, size_t len);
+size_t asm_opt_generate_status_response(char* buffer, size_t buffer_size, 
+                                       int status_code, const char* reason);
+size_t asm_opt_write_http_header(char* buffer, size_t buffer_size,
+                                const char* name, const char* value);
+size_t asm_opt_generate_content_length_header(char* buffer, size_t buffer_size, 
+                                             size_t content_length);
+
+// 网络I/O汇编优化函数
+ssize_t asm_opt_socket_send(int sockfd, const void* buffer, size_t len, int flags);
+ssize_t asm_opt_socket_recv(int sockfd, void* buffer, size_t len, int flags);
+size_t asm_opt_network_buffer_copy(void* dest, const void* src, size_t len);
+
+// 高级性能分析和调试汇编函数
+void asm_opt_get_cpu_performance_counters(asm_opt_perf_counter_t* counters);
+uint64_t asm_opt_memory_bandwidth_test(void* buffer, size_t size, int iterations);
+uint64_t asm_opt_latency_test(void* ptr, int iterations);
+
+// SSL/TLS加密相关汇编优化
+void asm_opt_aes_encrypt_block(const uint8_t* plaintext, uint8_t* ciphertext, 
+                              const uint8_t* round_keys, int rounds);
+void asm_opt_sha256_hash(const uint8_t* data, size_t len, uint8_t* hash);
+
+// 调试和诊断汇编函数
+uint64_t asm_opt_get_cpu_frequency(void);
+void asm_opt_get_cache_info(uint32_t* l1_cache_size, uint32_t* l2_cache_size, 
+                           uint32_t* l3_cache_size);
+void asm_opt_print_statistics(void);
 
 // 高级NEON SIMD优化函数
 void asm_opt_simd_zero_buffer(void* buffer, size_t size);
