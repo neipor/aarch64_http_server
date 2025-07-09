@@ -4,7 +4,7 @@
 
 ---
 
-作为一个对系统性能有极致追求的开发者，我一直对一个问题感到好奇：在2024年，我们能否利用现代硬件的全部潜力，创造出一个在特定领域超越像Nginx这样成熟解决方案的HTTP服务器？更疯狂的是，我能借助AI编程工具在几天内完成这个挑战吗？
+作为一个对系统性能有极致追求的开发者，我一直对一个问题感到好奇：在2025年，我们能否利用现代硬件的全部潜力，创造出一个在特定领域超越像Nginx这样成熟解决方案的HTTP服务器？更疯狂的是，我能借助AI编程工具在几天内完成这个挑战吗？
 
 答案是肯定的。我很高兴地向大家介绍**ANX (Assembly-optimized Nginx-like eXperimental server)**，一个在ARM64平台上性能卓越的HTTP服务器。
 
@@ -30,7 +30,7 @@ Nginx无疑是一个伟大的软件，但它诞生于一个与现在截然不同
 
 ## 🚀 AI如何将“不可能”变为“可能”
 
-AI编程工具，比如我使用的Gemini 2.5 Pro，在这次开发中扮演了多个角色：架构师、代码生成器、调试助手和文档工程师。
+AI编程工具，比如我使用的Claude 4 sonnet，在这次开发中扮演了多个角色：架构师、代码生成器、调试助手和文档工程师。
 
 ### 1. 架构设计与技术选型
 
@@ -104,8 +104,14 @@ ANX的核心竞争力在于其深度优化的架构：
 - **高并发压力测试**：ANX不仅吞吐量更高，而且在1000个并发连接下**零失败**，而Nginx出现了64个失败请求。这显示了ANX架构的稳定性和内存管理的优越性。
 - **资源使用**：ANX的内存占用仅为**1.5MB**，而Nginx为**6.8MB**。在资源受限的边缘设备上，这是一个巨大的优势。
 
-![Performance Chart](https://user-images.githubusercontent.com/12345/graph.png)  
-*(这里可以放一张总结性的图表)*
+```mermaid
+xychart-beta
+    title "ANX vs Nginx vs Dufs 性能对比 (吞吐量 req/s)"
+    x-axis ["小文件 (1KB)", "中等文件 (1MB)", "大文件 (10MB)", "压力测试"]
+    bar "ANX" [8598, 674, 97, 6422]
+    bar "Nginx" [8077, 698, 73, 6136]
+    bar "Dufs" [2665, 363, 42, 2502]
+```
 
 详细的测试报告可以在项目仓库中找到：[PERFORMANCE_REPORT.md](https://github.com/neipor/asm_http_server/blob/master/PERFORMANCE_REPORT.md)
 
