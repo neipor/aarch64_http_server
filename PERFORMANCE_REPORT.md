@@ -1,10 +1,10 @@
-# 🚀 ANX HTTP Server 性能测试报告
+# 🚀 anx - aarch64 NginX-like http server 性能测试报告
 
 [English Version](#english-version)
 
 ## 📋 测试概览
 
-本报告展示了ANX HTTP Server与Nginx和Dufs的全面性能对比测试结果。测试在隔离的Docker环境中进行，确保了结果的公平性和准确性。
+本报告展示了 anx 与Nginx和Dufs的全面性能对比测试结果。测试在隔离的Docker环境中进行，确保了结果的公平性和准确性。
 
 ## 🏗️ 测试环境
 
@@ -67,11 +67,11 @@
 | Nginx | 0.00% | 6.812 MiB | 0.09% |
 | Dufs | 0.00% | < 1 MiB | 0.01% |
 
-**🔋 ANX内存效率**: 比Nginx节省77.7%的内存
+**🔋 anx内存效率**: 比Nginx节省77.7%的内存
 
 ## 🏆 关键优势总结
 
-### ⚡ ANX HTTP Server 优势
+### ⚡ anx 优势
 
 1. **小文件性能领先**
    - 1KB文件吞吐量最高: 8,598 req/s
@@ -93,7 +93,7 @@
 
 ### 🔧 技术优化效果
 
-ANX的汇编优化在以下场景表现突出:
+anx的汇编优化在以下场景表现突出:
 
 1. **NEON SIMD优化**: 提升大文件传输性能
 2. **零拷贝优化**: 减少内存占用和CPU开销
@@ -111,7 +111,7 @@ ANX的汇编优化在以下场景表现突出:
 
 ## 🎯 结论
 
-### ANX HTTP Server 证明了以下优势:
+### anx 证明了以下优势:
 
 1. **✅ 在小文件和大文件传输中均优于Nginx**
 2. **✅ 高并发场景下稳定性更佳(零失败)**
@@ -125,29 +125,29 @@ ANX的汇编优化在以下场景表现突出:
 - 🥇 **内存效率最佳**: 比Nginx节省77.7%内存
 - 🥇 **总体性能均衡**: 在多个场景下保持领先
 
-## 🚀 汇编优化的实际价值
+## �� 汇编优化的实际价值
 
-这次测试证明了ANX HTTP Server中的ARM64汇编优化不仅仅是理论上的提升，而是在实际生产环境中可以带来:
+这次测试证明了anx中的ARM64汇编优化不仅仅是理论上的提升，而是在实际生产环境中可以带来:
 
 - **更高的服务器利用率**
 - **更好的用户体验(更快响应)**
 - **更低的运营成本(更少内存)**
 - **更强的系统稳定性**
 
-ANX HTTP Server成功证明了在现代ARM64平台上，精心设计的汇编优化可以显著超越成熟的服务器软件如Nginx，为高性能Web服务提供了新的可能性。 
+anx成功证明了在现代ARM64平台上，精心设计的汇编优化可以显著超越成熟的服务器软件如Nginx，为高性能Web服务提供了新的可能性。 
 
 ---
 <br>
 
-# 🚀 ANX HTTP Server Performance Test Report
+# 🚀 anx - aarch64 NginX-like http server Performance Test Report
 
 <a name="english-version"></a>
 
 ## 📋 Test Overview
 
-This report presents a comprehensive performance comparison between ANX HTTP Server, Nginx, and Dufs. The tests were conducted in an isolated Docker environment to ensure fair and accurate results.
+This report presents a comprehensive performance comparison between anx, Nginx, and Dufs. The tests were conducted in an isolated Docker environment to ensure fair and accurate results.
 
-## 🏗️ Test Environment
+## ��️ Test Environment
 
 - **Platform**: Linux ARM64 (Raspberry Pi)
 - **Framework**: Docker containerized environment
@@ -208,11 +208,11 @@ This report presents a comprehensive performance comparison between ANX HTTP Ser
 | Nginx   | 0.00%     | 6.812 MiB    | 0.09%    |
 | Dufs    | 0.00%     | < 1 MiB      | 0.01%    |
 
-**🔋 ANX Memory Efficiency**: Uses 77.7% less memory than Nginx.
+**🔋 anx Memory Efficiency**: Uses 77.7% less memory than Nginx.
 
 ## 🏆 Key Advantage Summary
 
-### ⚡ ANX HTTP Server Advantages
+### ⚡ anx Advantages
 
 1.  **Leading Small File Performance**
     -   Highest throughput for 1KB files: 8,598 req/s.
@@ -234,7 +234,7 @@ This report presents a comprehensive performance comparison between ANX HTTP Ser
 
 ### 🔧 Technical Optimization Impact
 
-ANX's assembly optimizations shined in these scenarios:
+anx's assembly optimizations shined in these scenarios:
 
 1.  **NEON SIMD Optimization**: Boosted large file transfer performance.
 2.  **Zero-Copy Optimization**: Reduced memory footprint and CPU overhead.
@@ -252,7 +252,7 @@ ANX's assembly optimizations shined in these scenarios:
 
 ## 🎯 Conclusion
 
-### ANX HTTP Server demonstrated the following advantages:
+### anx demonstrated the following advantages:
 
 1.  **✅ Outperforms Nginx in both small and large file transfers.**
 2.  **✅ More stable under high-concurrency scenarios (zero failures).**
@@ -268,11 +268,11 @@ ANX's assembly optimizations shined in these scenarios:
 
 ## 🚀 The Real-World Value of Assembly Optimization
 
-This testing proves that the ARM64 assembly optimizations in ANX HTTP Server are not just theoretical improvements. In a practical production environment, they can deliver:
+This testing proves that the ARM64 assembly optimizations in anx are not just theoretical improvements. In a practical production environment, they can deliver:
 
 -   **Higher server utilization.**
 -   **Better user experience (faster responses).**
 -   **Lower operational costs (less memory).**
 -   **Stronger system stability.**
 
-ANX HTTP Server successfully demonstrates that on modern ARM64 platforms, carefully designed assembly optimizations can significantly surpass mature server software like Nginx, opening up new possibilities for high-performance web services. 
+anx successfully demonstrates that on modern ARM64 platforms, carefully designed assembly optimizations can significantly surpass mature server software like Nginx, opening up new possibilities for high-performance web services. 

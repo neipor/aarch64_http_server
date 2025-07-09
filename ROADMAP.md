@@ -1,6 +1,6 @@
-# ANX HTTP Server - 项目开发路线图
+# anx - aarch64 NginX-like http server - 项目开发路线图
 
-本路线图规划了ANX HTTP Server的未来发展方向，旨在将其打造为一款功能全面、性能卓越、安全可靠的现代化Web服务器。
+本路线图规划了 anx 的未来发展方向，旨在将其打造为一款功能全面、性能卓越、安全可靠的现代化Web服务器。
 
 **作者**: neipor  
 **邮箱**: [neitherportal@proton.me](mailto:neitherportal@proton.me)
@@ -84,9 +84,9 @@
 ---
 <br>
 
-# ANX HTTP Server - Project Development Roadmap
+# anx - aarch64 NginX-like http server - Project Development Roadmap
 
-This roadmap outlines the future development direction for ANX HTTP Server, aiming to build it into a fully-featured, high-performance, secure, and reliable modern web server.
+This roadmap outlines the future development direction for anx, aiming to build it into a fully-featured, high-performance, secure, and reliable modern web server.
 
 **Author**: neipor  
 **Email**: [neitherportal@proton.me](mailto:neitherportal@proton.me)

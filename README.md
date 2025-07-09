@@ -1,6 +1,6 @@
-# ANX HTTP Server
+# anx - aarch64 NginX-like http server
 
-**ANX HTTP Server** 是一款基于C语言从零开发的、高性能、事件驱动的Web服务器。它借鉴了Nginx的设计哲学，采用多进程架构和epoll非阻塞I/O，旨在提供一个轻量级、高并发、功能丰富的Web服务解决方案。
+**anx** 是一款基于C语言从零开发的、在aarch64架构上经过汇编优化的、高性能、事件驱动的Web服务器。它借鉴了Nginx的设计哲学，采用多进程架构和epoll非阻塞I/O，旨在提供一个轻量级、高并发、功能丰富的Web服务解决方案。
 
 **作者**: neipor  
 **邮箱**: [neitherportal@proton.me](mailto:neitherportal@proton.me)
@@ -91,7 +91,7 @@
 
 ## English Version
 
-**ANX HTTP Server** is a high-performance, event-driven web server developed from scratch in C. It draws inspiration from Nginx's design philosophy, employing a multi-process architecture and epoll non-blocking I/O to provide a lightweight, high-concurrency, and feature-rich web service solution.
+**anx - aarch64 NginX-like http server** is a high-performance, event-driven web server developed from scratch in C, with assembly optimizations for the aarch64 architecture. It draws inspiration from Nginx's design philosophy, employing a multi-process architecture and epoll non-blocking I/O to provide a lightweight, high-concurrency, and feature-rich web service solution.
 
 **Author**: neipor  
 **Email**: [neitherportal@proton.me](mailto:neitherportal@proton.me)
