@@ -163,6 +163,7 @@ int chunked_send_final_chunk(chunked_context_t *ctx, const char *trailer_headers
 // 流式发送文件内容（支持分块传输编码）
 int chunked_send_file_stream(chunked_context_t *ctx, int file_fd, 
                             size_t file_size, chunked_config_t *config) {
+    (void)file_size; // 未使用的参数
     if (!ctx || file_fd < 0 || ctx->finished) {
         return -1;
     }

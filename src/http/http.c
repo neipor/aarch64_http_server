@@ -315,7 +315,9 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
                 const char *response = "HTTP/1.1 304 Not Modified\r\n"
                                       "Server: ANX HTTP Server/0.6.0\r\n"
                                       "Connection: close\r\n\r\n";
-                write(client_socket, response, strlen(response));
+                if (write(client_socket, response, strlen(response)) < 0) {
+                    log_message(LOG_LEVEL_ERROR, "Failed to write response to client");
+                }
                 
                 if (access_entry) {
                     access_entry->status_code = 304;
@@ -375,8 +377,12 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
                 header_len += snprintf(header + header_len, sizeof(header) - header_len,
                                       "Connection: close\r\n\r\n");
                 
-                write(client_socket, header, strlen(header));
-                write(client_socket, cached_response->content, cached_response->content_length);
+                if (write(client_socket, header, strlen(header)) < 0) {
+                    log_message(LOG_LEVEL_ERROR, "Failed to write header to client");
+                }
+                if (write(client_socket, cached_response->content, cached_response->content_length) < 0) {
+                    log_message(LOG_LEVEL_ERROR, "Failed to write cached content to client");
+                }
                 
                 if (access_entry) {
                     access_entry->status_code = 200;
@@ -410,7 +416,9 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
     if (!route.server) {
         // Send a 500 internal server error
         const char *response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
-        write(client_socket, response, strlen(response));
+        if (write(client_socket, response, strlen(response)) < 0) {
+            log_message(LOG_LEVEL_ERROR, "Failed to write 500 response to client");
+        }
         
         if (access_entry) {
             access_entry->status_code = 500;
@@ -511,7 +519,9 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
                                   "Content-Length: 15\r\n"
                                   "Connection: close\r\n\r\n"
                                   "Bad Gateway";
-            write(client_socket, response, strlen(response));
+            if (write(client_socket, response, strlen(response)) < 0) {
+                log_message(LOG_LEVEL_ERROR, "Failed to write proxy error response to client");
+            }
         }
         
         free(headers);
@@ -595,7 +605,9 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
                               "Content-Length: 21\r\n"
                               "Connection: close\r\n\r\n"
                               "Internal Server Error";
-        write(client_socket, response, strlen(response));
+        if (write(client_socket, response, strlen(response)) < 0) {
+            log_message(LOG_LEVEL_ERROR, "Failed to write 500 error response to client");
+        }
         
         if (access_entry) {
             access_entry->status_code = 500;
@@ -646,7 +658,7 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
     if (compress_config && compress_config->enable_compression && 
         accept_encoding && client_accepts_compression(accept_encoding) &&
         should_compress_mime_type(compress_config, mime_type) &&
-        file_stat.st_size >= compress_config->min_length) {
+        (size_t)file_stat.st_size >= compress_config->min_length) {
         
         should_compress = true;
         compress_ctx = compress_context_create(compress_config);
@@ -739,7 +751,7 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
         
         // 检查是否启用带宽限制并且文件大小满足条件
         if (bandwidth_config->enable_bandwidth_limit && 
-            file_stat.st_size >= bandwidth_config->min_file_size) {
+            (size_t)file_stat.st_size >= bandwidth_config->min_file_size) {
             
             // 查找匹配的带宽限制规则
             bandwidth_rule_t *rule = bandwidth_config_find_rule(bandwidth_config, 
@@ -781,7 +793,9 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
             if (bandwidth_ctrl) {
                 bandwidth_controlled_send(client_socket, header, strlen(header), bandwidth_ctrl);
             } else {
-                write(client_socket, header, strlen(header));
+                if (write(client_socket, header, strlen(header)) < 0) {
+                    log_message(LOG_LEVEL_ERROR, "Failed to write chunked header to client");
+                }
             }
             
             // 创建分块传输编码配置
@@ -819,7 +833,9 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
         if (bandwidth_ctrl) {
             bandwidth_controlled_send(client_socket, header, strlen(header), bandwidth_ctrl);
         } else {
-            write(client_socket, header, strlen(header));
+            if (write(client_socket, header, strlen(header)) < 0) {
+                log_message(LOG_LEVEL_ERROR, "Failed to write header to client");
+            }
         }
         
         if (should_compress && compressed_data) {
@@ -827,7 +843,9 @@ void handle_http_request(int client_socket, const char *client_ip, core_config_t
             if (bandwidth_ctrl) {
                 bandwidth_controlled_send(client_socket, (const char *)compressed_data, compressed_size, bandwidth_ctrl);
             } else {
-                write(client_socket, compressed_data, compressed_size);
+                if (write(client_socket, compressed_data, compressed_size) < 0) {
+                    log_message(LOG_LEVEL_ERROR, "Failed to write compressed data to client");
+                }
             }
             free(compressed_data);
         } else {

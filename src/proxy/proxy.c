@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "proxy.h"
 
 #include <arpa/inet.h>
@@ -11,6 +15,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <strings.h>
 
 #include "log.h"
 
@@ -240,6 +245,7 @@ static int forward_response(int backend_fd, int client_fd) {
 int handle_proxy_request(int client_socket, const char *method, const char *path, 
                         const char *http_version, const char *headers, 
                         const char *proxy_pass_url, const char *client_ip) {
+    (void)client_ip; // 未使用的参数
     char log_msg[256];
     snprintf(log_msg, sizeof(log_msg), "Proxying request %s %s to %s", 
              method, path, proxy_pass_url);
@@ -295,6 +301,7 @@ int handle_proxy_request(int client_socket, const char *method, const char *path
 int handle_https_proxy_request(SSL *ssl, const char *method, const char *path, 
                               const char *http_version, const char *headers,
                               const char *proxy_pass_url, const char *client_ip) {
+    (void)client_ip; // 未使用的参数
     char log_msg[256];
     snprintf(log_msg, sizeof(log_msg), "Proxying HTTPS request %s %s to %s", 
              method, path, proxy_pass_url);

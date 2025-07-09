@@ -9,14 +9,17 @@ CC = gcc
 # -std=c99: Use C99 standard
 CFLAGS = -g -Wall -O2 -Wextra -std=c99 -DDEBUG
 
+# Include paths for headers
+INCLUDES = -Isrc/include -Isrc/core -Isrc/http -Isrc/proxy -Isrc/stream -Isrc/utils -Isrc/utils/asm
+
 # Linker flags
 LDFLAGS = -lssl -lcrypto -lz -pthread
 
 # Source files and Object files
-# Find all .c files in the src directory
+# Find all .c files recursively in the src directory
 SRCDIR = src
 OBJDIR = build
-SOURCES = $(wildcard $(SRCDIR)/*.c)
+SOURCES = $(shell find $(SRCDIR) -name "*.c")
 OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
 # Target executable
@@ -33,9 +36,10 @@ $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
 	@echo "Build complete. Output: $(TARGET)"
 
+# 修改对象文件生成规则以支持嵌套目录
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
-	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # Build and test commands
 
@@ -68,50 +72,31 @@ check-deps:
 	@ldconfig -p | grep -q libssl.so || (echo "错误: OpenSSL 开发库未安装" && exit 1)
 	@ldconfig -p | grep -q libz.so || (echo "错误: zlib 开发库未安装" && exit 1)
 
+# 显示目录结构
+show-structure:
+	@echo "Project structure:"
+	@tree src/ || find src/ -type f -name "*.c" -o -name "*.h" | sort
+
 # 帮助信息
 help:
 	@echo "ANX HTTP Server 构建系统"
 	@echo
 	@echo "可用目标:"
-	@echo "  all        - 构建服务器 (默认)"
-	@echo "  clean      - 清理构建文件"
-	@echo "  test       - 运行测试套件"
-	@echo "  install    - 安装到系统"
-	@echo "  uninstall  - 从系统卸载"
-	@echo "  check-deps - 检查编译依赖"
+	@echo "  all           - 构建服务器 (默认)"
+	@echo "  clean         - 清理构建文件"
+	@echo "  test          - 运行测试套件"
+	@echo "  install       - 安装到系统"
+	@echo "  uninstall     - 从系统卸载"
+	@echo "  check-deps    - 检查编译依赖"
+	@echo "  show-structure- 显示项目结构"
 	@echo
 	@echo "编译选项:"
 	@echo "  CC      = $(CC)"
 	@echo "  CFLAGS  = $(CFLAGS)"
+	@echo "  INCLUDES= $(INCLUDES)"
 	@echo "  LDFLAGS = $(LDFLAGS)"
 
 format:
 	@echo "Formatting code..."
-	@find $(SRCDIR) -name "*.c" -o -name "*.h" | xargs clang-format -i
-	@echo "Code formatted!"
-
-# 依赖关系
-$(OBJDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/config.h $(SRCDIR)/core.h $(SRCDIR)/log.h $(SRCDIR)/net.h $(SRCDIR)/https.h
-$(OBJDIR)/server.o: $(SRCDIR)/server.c $(SRCDIR)/server.h $(SRCDIR)/core.h $(SRCDIR)/net.h $(SRCDIR)/http.h $(SRCDIR)/https.h $(SRCDIR)/log.h
-$(OBJDIR)/config.o: $(SRCDIR)/config.c $(SRCDIR)/config.h $(SRCDIR)/log.h $(SRCDIR)/compress.h $(SRCDIR)/cache.h $(SRCDIR)/health_check.h
-$(OBJDIR)/core.o: $(SRCDIR)/core.c $(SRCDIR)/core.h $(SRCDIR)/config.h $(SRCDIR)/log.h $(SRCDIR)/cache.h $(SRCDIR)/load_balancer.h $(SRCDIR)/health_check.h
-$(OBJDIR)/net.o: $(SRCDIR)/net.c $(SRCDIR)/net.h $(SRCDIR)/log.h
-$(OBJDIR)/http.o: $(SRCDIR)/http.c $(SRCDIR)/http.h $(SRCDIR)/core.h $(SRCDIR)/log.h $(SRCDIR)/util.h $(SRCDIR)/proxy.h $(SRCDIR)/lb_proxy.h $(SRCDIR)/headers.h $(SRCDIR)/compress.h $(SRCDIR)/cache.h $(SRCDIR)/chunked.h $(SRCDIR)/bandwidth.h
-$(OBJDIR)/https.o: $(SRCDIR)/https.c $(SRCDIR)/https.h $(SRCDIR)/core.h $(SRCDIR)/log.h $(SRCDIR)/util.h $(SRCDIR)/proxy.h $(SRCDIR)/lb_proxy.h $(SRCDIR)/headers.h $(SRCDIR)/compress.h $(SRCDIR)/cache.h $(SRCDIR)/chunked.h $(SRCDIR)/bandwidth.h
-$(OBJDIR)/chunked.o: $(SRCDIR)/chunked.c $(SRCDIR)/chunked.h $(SRCDIR)/log.h
-$(OBJDIR)/bandwidth.o: $(SRCDIR)/bandwidth.c $(SRCDIR)/bandwidth.h $(SRCDIR)/log.h
-$(OBJDIR)/stream.o: $(SRCDIR)/stream.c $(SRCDIR)/stream.h $(SRCDIR)/load_balancer.h $(SRCDIR)/log.h
-$(OBJDIR)/push.o: $(SRCDIR)/push.c $(SRCDIR)/push.h $(SRCDIR)/log.h
-$(OBJDIR)/log.o: $(SRCDIR)/log.c $(SRCDIR)/log.h
-$(OBJDIR)/util.o: $(SRCDIR)/util.c $(SRCDIR)/util.h
-$(OBJDIR)/proxy.o: $(SRCDIR)/proxy.c $(SRCDIR)/proxy.h $(SRCDIR)/log.h
-$(OBJDIR)/headers.o: $(SRCDIR)/headers.c $(SRCDIR)/headers.h $(SRCDIR)/config.h $(SRCDIR)/log.h
-$(OBJDIR)/compress.o: $(SRCDIR)/compress.c $(SRCDIR)/compress.h $(SRCDIR)/log.h
-$(OBJDIR)/cache.o: $(SRCDIR)/cache.c $(SRCDIR)/cache.h $(SRCDIR)/log.h
-$(OBJDIR)/load_balancer.o: $(SRCDIR)/load_balancer.c $(SRCDIR)/load_balancer.h $(SRCDIR)/log.h $(SRCDIR)/health_check.h
-$(OBJDIR)/lb_proxy.o: $(SRCDIR)/lb_proxy.c $(SRCDIR)/lb_proxy.h $(SRCDIR)/load_balancer.h $(SRCDIR)/core.h $(SRCDIR)/log.h
-$(OBJDIR)/health_check.o: $(SRCDIR)/health_check.c $(SRCDIR)/health_check.h $(SRCDIR)/load_balancer.h $(SRCDIR)/log.h
-$(OBJDIR)/health_api.o: $(SRCDIR)/health_api.c $(SRCDIR)/health_api.h $(SRCDIR)/health_check.h $(SRCDIR)/load_balancer.h $(SRCDIR)/log.h
-$(OBJDIR)/asm_opt.o: $(SRCDIR)/asm_opt.c $(SRCDIR)/asm_opt.h $(SRCDIR)/log.h
-$(OBJDIR)/asm_mempool.o: $(SRCDIR)/asm_mempool.c $(SRCDIR)/asm_mempool.h $(SRCDIR)/asm_opt.h $(SRCDIR)/log.h
-$(OBJDIR)/asm_integration.o: $(SRCDIR)/asm_integration.c $(SRCDIR)/asm_integration.h $(SRCDIR)/asm_opt.h $(SRCDIR)/asm_mempool.h $(SRCDIR)/log.h 
+	@find $(SRCDIR) -name "*.c" -o -name "*.h" | xargs clang-format -i 2>/dev/null || echo "clang-format not available"
+	@echo "Code formatted!" 

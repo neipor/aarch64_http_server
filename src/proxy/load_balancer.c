@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "load_balancer.h"
 #include "log.h"
 #include "health_check.h"
@@ -13,6 +17,9 @@
 #include <math.h>
 #include <limits.h>
 #include <ctype.h>
+#include <time.h>
+#include <sys/time.h>
+#include <pthread.h>
 
 // 全局会话表
 static session_info_t *session_table = NULL;
@@ -1080,6 +1087,8 @@ void lb_selection_free(lb_selection_t *selection) {
 
 // 配置解析
 int lb_parse_upstream_block(const char *block_content, lb_config_t *config) {
+    (void)block_content; // 未使用的参数
+    (void)config; // 未使用的参数
     // 简化的配置解析实现
     // 实际实现需要更复杂的解析逻辑
     return 0;

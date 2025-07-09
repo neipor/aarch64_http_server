@@ -197,7 +197,7 @@ ssize_t asm_optimized_send(int socket_fd, const void* buffer, size_t len, int fl
             remaining -= sent;
             
             // 如果发送的数据少于请求的，可能是缓冲区满了
-            if (sent < chunk_size) {
+            if (sent < (ssize_t)chunk_size) {
                 break;
             }
         }

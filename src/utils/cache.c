@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <openssl/md5.h>
+#include <openssl/evp.h>
 
 #define DEFAULT_HASH_SIZE 1024
 #define DEFAULT_MAX_SIZE (64 * 1024 * 1024)  // 64MB
@@ -226,8 +227,20 @@ char *cache_generate_etag(const char *path, time_t mtime, size_t size) {
     char input[1024];
     snprintf(input, sizeof(input), "%s-%ld-%zu", path, mtime, size);
     
-    unsigned char hash[MD5_DIGEST_LENGTH];
-    MD5((unsigned char *)input, strlen(input), hash);
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+    
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    if (!ctx) return NULL;
+    
+    if (EVP_DigestInit_ex(ctx, EVP_md5(), NULL) != 1 ||
+        EVP_DigestUpdate(ctx, input, strlen(input)) != 1 ||
+        EVP_DigestFinal_ex(ctx, hash, &hash_len) != 1) {
+        EVP_MD_CTX_free(ctx);
+        return NULL;
+    }
+    
+    EVP_MD_CTX_free(ctx);
     
     char *etag = malloc(64);
     if (!etag) return NULL;

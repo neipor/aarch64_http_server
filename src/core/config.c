@@ -122,6 +122,11 @@ static location_block_t *parse_location_block(int *token_idx);
 static directive_t parse_directive(int *token_idx);
 static upstream_block_t *parse_upstream_block(int *token_idx);
 
+// 前向声明函数
+int handle_compression_directive(config_t *config, const char *directive, const char *value);
+int handle_cache_directive(config_t *config, const char *directive, const char *value);
+int handle_bandwidth_directive(config_t *config, const char *directive, const char *value);
+
 static upstream_block_t *parse_upstream_block(int *token_idx) {
   if (strcmp(tokens[*token_idx], "upstream") != 0) {
     log_message(LOG_LEVEL_ERROR, "Expected 'upstream' keyword.");
@@ -418,7 +423,12 @@ config_t *parse_config(const char *filename) {
         fclose(file);
         return NULL;
     }
-    fread(content, 1, length, file);
+    if (fread(content, 1, length, file) != (size_t)length) {
+        log_message(LOG_LEVEL_ERROR, "Failed to read config file completely");
+        free(content);
+        fclose(file);
+        return NULL;
+    }
     content[length] = '\0';
     fclose(file);
 

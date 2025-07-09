@@ -90,6 +90,7 @@ static void* mempool_alloc_aligned_asm_impl(size_t size, size_t alignment) {
 
 // 创建内存池
 mempool_t* mempool_create(size_t initial_size) {
+    (void)initial_size; // 未使用的参数
     mempool_config_t* config = mempool_get_default_config();
     return mempool_create_with_config(config);
 }
@@ -357,6 +358,7 @@ void mempool_gc(mempool_t* pool) {
     for (int type = 0; type < MEMPOOL_TYPE_MAX; type++) {
         mempool_block_t* block = pool->free_blocks[type];
         mempool_block_t* prev = NULL;
+        (void)prev; // 未使用的变量
         int free_count = 0;
         
         // 计算空闲块数量
@@ -560,6 +562,7 @@ void* mempool_alloc_aligned(mempool_t* pool, size_t size, size_t alignment) {
 }
 
 void* mempool_alloc_aligned_asm(mempool_t* pool, size_t size, size_t alignment) {
+    (void)pool; // 未使用的参数
     return mempool_alloc_aligned_asm_impl(size, alignment);
 }
 

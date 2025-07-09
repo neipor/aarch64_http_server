@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <signal.h>
@@ -6,6 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <sys/types.h>
 
 #include "config.h"
 #include "core.h"

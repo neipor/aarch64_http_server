@@ -19,8 +19,6 @@ anx
 
 # Generated files
 build/
-*.log
-logs/*.log
 *.core
 *.stackdump
 
@@ -36,24 +34,6 @@ logs/*.log
 .DS_Store
 .idea/
 *.sublime-*
-
-# Configuration files (optional)
-# Uncomment these lines if you want to ignore user-specific configs
-# server.conf
-# *.conf
-
-# Test output
-test-results/
-test-logs/
-test_files/test_output/
-
-# Documentation generated files
-docs/html/
-docs/latex/
-
-# Package managers
-node_modules/
-npm-debug.log*
 
 # Debug files
 *.dSYM/
@@ -128,18 +108,6 @@ compile
 Makefile.in
 aclocal.m4
 
-# CMake
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-*.cmake
-!CMakeLists.txt
-
-# Personal notes
-TODO.txt
-NOTES.txt
-.personal/
-
 # IDE specific files
 tags
 .tags
@@ -161,39 +129,11 @@ Desktop.ini
 *.ii
 *.s
 
-# Additional rules for restructured project
-
-# New build directories
-build-*/
-.build/
-dist/
-obj/
-
-# Restructured test outputs  
-tests/tmp/
-tests/output/
-*.test
-
-# Documentation build outputs
-docs/build/
-
 # Additional SSL certificate locations
 configs/ssl/*.key
 configs/ssl/*.crt
 configs/ssl/*.pem
 
-# Development and debugging outputs
-debug_output.txt
-performance_report.txt
-
 # Keep example configs but ignore actual configs
 !*.conf.example
-!configs/*.example
-
-# Temporary test files (as per user rules)
-test_*.sh
-debug_*.sh
-test_*.py
-docker-compose.test.yml
-benchmark_*.log
-refactor_backup/ 
+!configs/*.example 

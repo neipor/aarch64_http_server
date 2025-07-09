@@ -4,11 +4,15 @@
 
 #include "health_api.h"
 #include "log.h"
+#include "load_balancer.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
+
+// 函数声明（如果在头文件中找不到）
+const char *lb_algorithm_to_string(lb_strategy_t algorithm);
 
 // 预定义的API路由
 static health_api_route_t api_routes[] = {
@@ -250,6 +254,8 @@ health_api_response_t *health_api_get_server_history_handler(health_api_request_
 }
 
 health_api_response_t *health_api_force_check_handler(health_api_request_t *request, lb_config_t *lb_config) {
+    (void)request; // 未使用的参数
+    (void)lb_config; // 未使用的参数
     health_api_response_t *response = health_api_response_create();
     response->status_code = 200;
     response->content_type = strdup("application/json");
@@ -260,6 +266,8 @@ health_api_response_t *health_api_force_check_handler(health_api_request_t *requ
 }
 
 health_api_response_t *health_api_enable_check_handler(health_api_request_t *request, lb_config_t *lb_config) {
+    (void)request; // 未使用的参数
+    (void)lb_config; // 未使用的参数
     health_api_response_t *response = health_api_response_create();
     response->status_code = 200;
     response->content_type = strdup("application/json");
@@ -270,6 +278,8 @@ health_api_response_t *health_api_enable_check_handler(health_api_request_t *req
 }
 
 health_api_response_t *health_api_disable_check_handler(health_api_request_t *request, lb_config_t *lb_config) {
+    (void)request; // 未使用的参数
+    (void)lb_config; // 未使用的参数
     health_api_response_t *response = health_api_response_create();
     response->status_code = 200;
     response->content_type = strdup("application/json");

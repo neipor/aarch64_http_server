@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "log.h"
 #include <time.h>
 #include <unistd.h>
@@ -297,7 +301,11 @@ int rotate_log_file(const char *log_file) {
     time_t now = time(NULL);
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", localtime(&now));
     
-    snprintf(old_log_file, sizeof(old_log_file), "%s.%s", log_file, timestamp);
+    int ret = snprintf(old_log_file, sizeof(old_log_file), "%s.%s", log_file, timestamp);
+    if (ret >= (int)sizeof(old_log_file)) {
+        log_message(LOG_LEVEL_ERROR, "Log file path too long for rotation");
+        return -1;
+    }
     
     if (rename(log_file, old_log_file) != 0) {
         log_message(LOG_LEVEL_ERROR, "Failed to rotate log file");
@@ -314,7 +322,7 @@ int rotate_log_file(const char *log_file) {
         }
     }
     
-    char message[256];
+    char message[1024];  // 增加缓冲区大小
     snprintf(message, sizeof(message), "Log file rotated: %s -> %s", log_file, old_log_file);
     log_message(LOG_LEVEL_INFO, message);
     

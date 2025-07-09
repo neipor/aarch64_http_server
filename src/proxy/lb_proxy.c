@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "lb_proxy.h"
 #include "log.h"
 #include <stdio.h>
@@ -6,6 +10,9 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <ctype.h>
+#include <sys/socket.h>
+#include <strings.h>
 
 #define BUFFER_SIZE 4096
 

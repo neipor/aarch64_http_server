@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "https.h"
 
 #include <errno.h>
@@ -10,6 +14,9 @@
 #include <sys/sendfile.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "config.h"
 #include "core.h"
@@ -399,7 +406,7 @@ void handle_https_request(SSL *ssl, const char *client_ip, core_config_t *core_c
     if (compress_config && compress_config->enable_compression && 
         accept_encoding && client_accepts_compression(accept_encoding) &&
         should_compress_mime_type(compress_config, mime_type) &&
-        file_stat.st_size >= compress_config->min_length && file_fd >= 0) {
+        (size_t)file_stat.st_size >= compress_config->min_length && file_fd >= 0) {
         
         should_compress = true;
         compress_ctx = compress_context_create(compress_config);

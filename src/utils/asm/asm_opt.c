@@ -1429,7 +1429,7 @@ size_t asm_opt_simd_url_decode(const char* src, size_t src_len, char* dst, size_
         }
         
         // 处理剩余字符或%编码
-        while (remaining > 0 && (out - dst) < dst_len - 1) {
+        while (remaining > 0 && (size_t)(out - dst) < dst_len - 1) {
             if (*in == '%' && remaining >= 3) {
                 // 十六进制解码
                 char hex1 = in[1];

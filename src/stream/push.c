@@ -333,7 +333,7 @@ char *push_message_serialize_sse(push_message_t *message) {
         // 处理多行数据
         char *data_copy = strdup(message->data);
         char *line = strtok(data_copy, "\n");
-        while (line && offset < buffer_size - 20) {
+        while (line && (size_t)offset < buffer_size - 20) {
             offset += snprintf(buffer + offset, buffer_size - offset, "data: %s\n", line);
             line = strtok(NULL, "\n");
         }
@@ -508,7 +508,7 @@ char *push_generate_client_id(const char *client_ip) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     
-    snprintf(id, 64, "client_%s_%ld_%d_%d", 
+        snprintf(id, 64, "client_%s_%ld_%ld_%d",
              client_ip, tv.tv_sec, tv.tv_usec, ++client_counter);
     
     return id;

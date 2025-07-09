@@ -108,6 +108,8 @@ void apply_headers_to_response(char *response_buffer, size_t buffer_size,
                               const header_context_t *context, 
                               int status_code, const char *content_type, 
                               long content_length) {
+    (void)content_type; // 未使用的参数
+    (void)content_length; // 未使用的参数
     if (!context || !context->operations) return;
     
     // 检查是否是错误状态码
@@ -158,6 +160,8 @@ void apply_headers_to_response(char *response_buffer, size_t buffer_size,
 void apply_headers_to_proxy_request(char *request_buffer, size_t buffer_size,
                                    const header_context_t *context,
                                    const char *method, const char *path) {
+    (void)method; // 未使用的参数
+    (void)path; // 未使用的参数
     if (!context || !context->operations) return;
     
     // 为代理请求应用头部操作
