@@ -36,7 +36,21 @@
     -   [ ] 支持更多aarch64指令 (如SVE)。
     -   [ ] 为x86_64架构添加SSE/AVX优化。
 
-### 中期目标 (v1.1.0 - v1.5.0) - 功能完善与生态
+### 核心目标 (v1.1.0+) - 架构演进：迈向C/Rust混合系统
+
+这是项目下一阶段的**最重要目标**，旨在通过引入Rust来从根本上提升服务器的安全性、稳定性和可维护性，同时保持其顶尖性能。详细计划请参阅 `ARCHITECTURE.md`。
+
+-   [ ] **阶段一：新一代配置系统**
+    -   [ ] **原生配置支持**: 使用Rust, TOML和`serde`库，实现一个全新的、类型安全的TOML配置解析器 (`anx.toml`)。
+    -   [ ] **FFI集成**: 将新的Rust配置模块编译为静态库，并集成到现有的C语言核心中。
+    -   [ ] **Nginx兼容层**: 开发一个兼容层，用于读取常见的`nginx.conf`配置，方便用户平滑迁移。
+-   [ ] **阶段二：核心逻辑现代化**
+    -   [ ] **HTTP解析器重构**: 逐步将C语言实现的、逻辑复杂的HTTP头部和请求解析逻辑，迁移到新的、更安全的Rust模块中。
+    -   [ ] **缓存系统重构**: 利用Rust的并发安全特性和现有生态库，重构缓存系统，以消除潜在的并发bug。
+-   [ ] **阶段三：构建系统升级**
+    -   [ ] 引入`cargo`来管理Rust部分，并调整`Makefile`以支持混合编译流程。
+
+### 中期目标 (v1.5.0+) - 功能完善与生态
 
 -   [ ] **HTTP/2 支持**:
     -   [ ] 实现HTTP/2协议栈。
@@ -120,7 +134,21 @@ This roadmap outlines the future development direction for anx, aiming to build 
     -   [ ] Support for more aarch64 instructions (e.g., SVE).
     -   [ ] Add SSE/AVX optimizations for the x86_64 architecture.
 
-### Mid-Term Goals (v1.1.0 - v1.5.0) - Feature Completion & Ecosystem
+### Core Goal (v1.1.0+) - Architectural Evolution: Towards a C/Rust Hybrid System
+
+This is the **most critical goal** for the next phase of the project. It aims to fundamentally enhance the server's security, stability, and maintainability by introducing Rust, while retaining its top-tier performance. For a detailed strategy, see `ARCHITECTURE.md`.
+
+-   [ ] **Phase 1: Next-Generation Configuration System**
+    -   [ ] **Native Configuration Support**: Implement a new, type-safe TOML configuration parser (`anx.toml`) using Rust, TOML, and the `serde` library.
+    -   [ ] **FFI Integration**: Compile the new Rust configuration module as a static library and integrate it into the existing C core.
+    -   [ ] **Nginx Compatibility Layer**: Develop a compatibility layer to read common `nginx.conf` configurations, facilitating smooth migration for users.
+-   [ ] **Phase 2: Core Logic Modernization**
+    -   [ ] **HTTP Parser Refactoring**: Gradually migrate the complex HTTP header and request parsing logic from C to a new, safer Rust module.
+    -   [ ] **Cache System Refactoring**: Leverage Rust's concurrency safety and ecosystem libraries to refactor the cache system, eliminating potential concurrency bugs.
+-   [ ] **Phase 3: Build System Upgrade**
+    -   [ ] Introduce `cargo` to manage the Rust parts and adapt the `Makefile` to support the hybrid compilation process.
+
+### Mid-Term Goals (v1.5.0+) - Feature Completion & Ecosystem
 
 -   [ ] **HTTP/2 Support**:
     -   [ ] Implement the HTTP/2 protocol stack.
