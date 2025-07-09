@@ -9,6 +9,8 @@
 ![Assembly](https://img.shields.io/badge/Assembly-6D84B4?style=for-the-badge&logo=assembly&logoColor=white)
 ![Makefile](https://img.shields.io/badge/Makefile-427819?style=for-the-badge&logo=gnu&logoColor=white)
 
+[English Version](#english-version)
+
 ---
 
 ## 🚀 核心功能
@@ -52,7 +54,7 @@
 1.  **克隆仓库**:
     ```bash
     git clone https://github.com/neipor/asm_http_server.git
-    cd anx-http-server
+    cd asm_http_server
     ```
 
 2.  **编译**:
@@ -68,7 +70,7 @@
 3.  **运行**:
     ```bash
     ./anx -c /path/to/your/anx.conf
-    ``
+    ```
 
 ## 📜 项目版本历史
 
@@ -85,5 +87,90 @@
 欢迎任何形式的贡献！如果您有任何问题或建议，请随时提交Issue或Pull Request。
 
 ---
+<br>
 
-> 该项目由 **neipor** 开发和维护。 
+## English Version
+
+**ANX HTTP Server** is a high-performance, event-driven web server developed from scratch in C. It draws inspiration from Nginx's design philosophy, employing a multi-process architecture and epoll non-blocking I/O to provide a lightweight, high-concurrency, and feature-rich web service solution.
+
+**Author**: neipor  
+**Email**: [neitherportal@proton.me](mailto:neitherportal@proton.me)
+
+---
+
+## 🚀 Core Features
+
+- **High-Performance Network Model**: 
+  - **Non-blocking I/O** based on `epoll`, supporting massive concurrent connections.
+  - **Multi-process architecture** to fully leverage multi-core CPU performance.
+  - `sendfile()` **zero-copy** technology for efficient static file serving.
+
+- **Rich Feature Support**:
+  - **Static File Serving**: With MIME type detection and secure path checking.
+  - **Reverse Proxy**: Supports HTTP/HTTPS proxying with configurable load balancing.
+  - **Content Compression**: Supports dynamic Gzip compression to improve transfer efficiency.
+  - **Header Manipulation**: Allows adding, modifying, and deleting custom HTTP headers.
+  - **Load Balancing**: Built-in algorithms (Round Robin, IP Hash, Least Connections).
+  - **Health Checks**: Active and passive health checks to automatically remove faulty nodes.
+  - **Streaming**: Supports Chunked Transfer-Encoding.
+  - **Real-time Push**: Supports Server-Sent Events (SSE).
+
+- **AArch64 Assembly Optimizations**:
+  - **NEON SIMD** instruction set to accelerate memory operations (`memcpy`, `memset`).
+  - **CRC32** hardware instructions to speed up hash calculations.
+  - Optimized **string handling** and **network byte order conversion**.
+  - High-performance **memory pool** to reduce system call overhead.
+
+- **Highly Configurable**:
+  - Nginx-like **configuration file syntax**, supporting multiple `server` and `location` blocks.
+  - Detailed **logging system** with support for access and error logs.
+
+## 🛠️ Quick Start
+
+### Dependencies
+
+- **GCC** (v9.0+ recommended)
+- **OpenSSL** (v1.1.1+ recommended)
+- **Zlib**
+- **Make**
+
+### Compilation and Execution
+
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/neipor/asm_http_server.git
+    cd asm_http_server
+    ```
+
+2.  **Compile**:
+    - **Debug mode**:
+      ```bash
+      make
+      ```
+    - **Production mode (recommended)**:
+      ```bash
+      make CFLAGS="-O3 -march=native -DNDEBUG"
+      ```
+
+3.  **Run**:
+    ```bash
+    ./anx -c /path/to/your/anx.conf
+    ```
+
+## 📜 Project Version History
+
+- **v0.8.0**: Integrated aarch64 assembly optimization module, implemented streaming and real-time features.
+- **v0.6.0**: Implemented the multi-process worker model.
+- **v0.5.0**: Implemented the Nginx-like configuration file parser.
+- **v0.4.0**: Implemented static file serving and reverse proxy.
+- **v0.3.0**: Introduced the epoll non-blocking I/O model.
+- **v0.2.0**: Implemented a basic HTTP server in C.
+- **v0.1.0**: Project initialization, assembly-based TCP server prototype.
+
+## 🤝 Contributing
+
+Contributions of any kind are welcome! If you have any questions or suggestions, please feel free to submit an Issue or Pull Request.
+
+---
+
+> This project is developed and maintained by **neipor**. 

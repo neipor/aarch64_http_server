@@ -5,6 +5,14 @@ All notable changes to the ANX HTTP Server project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+---
+**说明 (Note)**
+
+**中文**: 此文件记录了 ANX HTTP Server 项目的所有重要变更。它遵循 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 格式，并基于项目的 Git 提交历史自动生成。由于其内容主要是技术性的开发日志，我们仅在此提供说明，不对每条具体的更新历史进行翻译。
+
+**English**: This file documents all notable changes to the ANX HTTP Server project. It follows the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format and is automatically generated based on the project's Git commit history. As its content consists primarily of technical development logs, we are providing this note for explanation and will not be translating each specific update history entry.
+---
+
 ## [0.8.0] - 2024-12-19
 
 ### 🚀 Major Feature: Enterprise Load Balancing System

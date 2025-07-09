@@ -1,5 +1,7 @@
 # 🚀 ANX HTTP Server 性能测试报告
 
+[English Version](#english-version)
+
 ## 📋 测试概览
 
 本报告展示了ANX HTTP Server与Nginx和Dufs的全面性能对比测试结果。测试在隔离的Docker环境中进行，确保了结果的公平性和准确性。
@@ -133,3 +135,144 @@ ANX的汇编优化在以下场景表现突出:
 - **更强的系统稳定性**
 
 ANX HTTP Server成功证明了在现代ARM64平台上，精心设计的汇编优化可以显著超越成熟的服务器软件如Nginx，为高性能Web服务提供了新的可能性。 
+
+---
+<br>
+
+# 🚀 ANX HTTP Server Performance Test Report
+
+<a name="english-version"></a>
+
+## 📋 Test Overview
+
+This report presents a comprehensive performance comparison between ANX HTTP Server, Nginx, and Dufs. The tests were conducted in an isolated Docker environment to ensure fair and accurate results.
+
+## 🏗️ Test Environment
+
+- **Platform**: Linux ARM64 (Raspberry Pi)
+- **Framework**: Docker containerized environment
+- **Network**: Docker bridge network (no port mapping)
+- **Tools**: Apache Bench (ab), curl
+- **Client**: Ubuntu 24.04 container
+
+## 📊 Performance Comparison Results
+
+### 🔹 Small File Test (1KB)
+
+| Server  | Avg. Latency | Throughput (req/s) | Response Time (ms) | Failed Req. |
+|---------|--------------|--------------------|--------------------|-------------|
+| **ANX** | **0.0011s**  | **8,598.60**       | **11.630**         | **0**       |
+| Nginx   | 0.0011s      | 8,077.94           | 12.379             | 0           |
+| Dufs    | 0.0017s      | 2,665.54           | 37.516             | 0           |
+
+**🏆 ANX Wins**: 6.4% higher throughput than Nginx, 222% higher than Dufs.
+
+### 🔹 Medium File Test (1MB)
+
+| Server  | Avg. Latency | Throughput (req/s) | Response Time (ms) | Failed Req. |
+|---------|--------------|--------------------|--------------------|-------------|
+| ANX     | 0.0020s      | 674.94             | 148.161            | 0           |
+| **Nginx** | **0.0020s**  | **698.84**         | **143.095**        | **0**       |
+| Dufs    | 0.0035s      | 363.12             | 275.392            | 0           |
+
+**📈 Competitive**: Nginx slightly wins on 1MB files, but the margin is only 3.5%.
+
+### 🔹 Large File Test (10MB)
+
+| Server  | Avg. Latency | Throughput (req/s) | Response Time (ms) | Failed Req. |
+|---------|--------------|--------------------|--------------------|-------------|
+| **ANX** | **0.0267s**  | **97.56**          | **1,025.053**      | **0**       |
+| Nginx   | 0.0063s      | 73.53              | 1,360.043          | 0           |
+| Dufs    | 0.0168s      | 42.26              | 2,366.479          | 0           |
+
+**🚀 ANX Leads Significantly**: 32.7% higher throughput than Nginx, 130.8% higher than Dufs.
+
+### 💪 Stress Test (1000 concurrent, 5000 requests)
+
+| Server  | Throughput (req/s) | Response Time (ms) | Failed Req. |
+|---------|--------------------|--------------------|-------------|
+| **ANX** | **6,422.04**       | **155.714**        | **0**       |
+| Nginx   | 6,136.46           | 162.960            | 64          |
+| Dufs    | 2,502.86           | 399.543            | 0           |
+
+**🎯 ANX Best in Stress Test**: 
+- 4.6% higher throughput than Nginx.
+- **Zero failed requests** vs. Nginx's 64 failures.
+- 4.4% faster response time than Nginx.
+
+### 📈 Resource Usage Comparison
+
+| Server  | CPU Usage | Memory Usage | Memory % |
+|---------|-----------|--------------|----------|
+| **ANX** | **0.00%** | **1.516 MiB**  | **0.02%**|
+| Nginx   | 0.00%     | 6.812 MiB    | 0.09%    |
+| Dufs    | 0.00%     | < 1 MiB      | 0.01%    |
+
+**🔋 ANX Memory Efficiency**: Uses 77.7% less memory than Nginx.
+
+## 🏆 Key Advantage Summary
+
+### ⚡ ANX HTTP Server Advantages
+
+1.  **Leading Small File Performance**
+    -   Highest throughput for 1KB files: 8,598 req/s.
+    -   Fastest response time: 11.63ms.
+    -   Zero failed requests.
+
+2.  **Significant Large File Transfer Advantage**
+    -   32.7% higher throughput than Nginx for 10MB files.
+    -   24.6% faster response time than Nginx.
+
+3.  **Stress Test Stability**
+    -   Zero failed requests under high concurrency.
+    -   4.6% higher throughput than Nginx.
+    -   Faster response time.
+
+4.  **Superior Resource Efficiency**
+    -   Uses 77.7% less memory than Nginx.
+    -   CPU usage remains minimal.
+
+### 🔧 Technical Optimization Impact
+
+ANX's assembly optimizations shined in these scenarios:
+
+1.  **NEON SIMD Optimization**: Boosted large file transfer performance.
+2.  **Zero-Copy Optimization**: Reduced memory footprint and CPU overhead.
+3.  **Event-Driven Architecture**: Enhanced concurrency handling.
+4.  **Memory Pool Management**: Optimized memory allocation efficiency.
+
+## 📈 Performance Trend Analysis
+
+| File Size   | ANX vs Nginx | ANX vs Dufs  | Area of Strength      |
+|-------------|--------------|--------------|-----------------------|
+| 1KB         | +6.4%        | +222%        | Small File Handling   |
+| 1MB         | -3.5%        | +85.9%       | Medium Workloads      |
+| 10MB        | +32.7%       | +130.8%      | **Large File Transfer** |
+| Stress Test | +4.6%        | +156.6%      | **High Concurrency**  |
+
+## 🎯 Conclusion
+
+### ANX HTTP Server demonstrated the following advantages:
+
+1.  **✅ Outperforms Nginx in both small and large file transfers.**
+2.  **✅ More stable under high-concurrency scenarios (zero failures).**
+3.  **✅ Significantly more memory-efficient than competitors.**
+4.  **✅ Assembly optimizations provide measurable performance gains in real-world scenarios.**
+
+### Particularly Outstanding Achievements:
+
+-   🥇 **Leading in Large File Transfers**: 32.7% throughput advantage.
+-   🥇 **Zero Failures in Stress Test**: Demonstrates excellent stability.
+-   🥇 **Best Memory Efficiency**: 77.7% less memory used than Nginx.
+-   🥇 **Balanced Overall Performance**: Maintains a leading edge across multiple scenarios.
+
+## 🚀 The Real-World Value of Assembly Optimization
+
+This testing proves that the ARM64 assembly optimizations in ANX HTTP Server are not just theoretical improvements. In a practical production environment, they can deliver:
+
+-   **Higher server utilization.**
+-   **Better user experience (faster responses).**
+-   **Lower operational costs (less memory).**
+-   **Stronger system stability.**
+
+ANX HTTP Server successfully demonstrates that on modern ARM64 platforms, carefully designed assembly optimizations can significantly surpass mature server software like Nginx, opening up new possibilities for high-performance web services. 
