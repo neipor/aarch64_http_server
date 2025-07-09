@@ -8,6 +8,7 @@
 ![C](https://img.shields.io/badge/C-A8B9CC?style=for-the-badge&logo=c&logoColor=white)
 ![Assembly](https://img.shields.io/badge/Assembly-6D84B4?style=for-the-badge&logo=assembly&logoColor=white)
 ![Makefile](https://img.shields.io/badge/Makefile-427819?style=for-the-badge&logo=gnu&logoColor=white)
+![GPLv3 License](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)
 
 [English Version](#english-version)
 
@@ -85,6 +86,10 @@
 ## 🤝 贡献
 
 欢迎任何形式的贡献！如果您有任何问题或建议，请随时提交Issue或Pull Request。
+
+## 📄 许可证
+
+本项目采用 [GNU General Public License v3.0](LICENSE)。
 
 ---
 <br>
@@ -170,6 +175,10 @@
 ## 🤝 Contributing
 
 Contributions of any kind are welcome! If you have any questions or suggestions, please feel free to submit an Issue or Pull Request.
+
+## 📄 License
+
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
 
 ---
 
