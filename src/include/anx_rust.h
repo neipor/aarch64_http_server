@@ -24,6 +24,12 @@ typedef struct HttpResponseHandle HttpResponseHandle;
 /// Opaque handle for cache
 typedef struct CacheHandle CacheHandle;
 
+/// Opaque handle for CLI parser
+typedef struct CliParser CliParser;
+
+/// Opaque handle for CLI config
+typedef struct CliConfigHandle CliConfigHandle;
+
 /// Cache response structure
 typedef struct {
     uint8_t *data;
@@ -189,6 +195,76 @@ void anx_free_string(char *ptr);
 
 /// Free byte array allocated by Rust
 void anx_free_bytes(uint8_t *ptr, size_t len);
+
+// =============================================================================
+// CLI Functions
+// =============================================================================
+
+/// Create CLI parser
+CliParser* anx_cli_parser_create(void);
+
+/// Parse command line arguments
+CliConfigHandle* anx_cli_parse_args(CliParser *parser);
+
+/// Get port from CLI config
+uint16_t anx_cli_get_port(const CliConfigHandle *handle);
+
+/// Get host from CLI config
+char* anx_cli_get_host(const CliConfigHandle *handle);
+
+/// Get static directory from CLI config
+char* anx_cli_get_static_dir(const CliConfigHandle *handle);
+
+/// Get proxy count from CLI config
+size_t anx_cli_get_proxy_count(const CliConfigHandle *handle);
+
+/// Get proxy URL from CLI config
+char* anx_cli_get_proxy_url(const CliConfigHandle *handle, size_t index);
+
+/// Get proxy path prefix from CLI config
+char* anx_cli_get_proxy_path_prefix(const CliConfigHandle *handle, size_t index);
+
+/// Check if SSL is enabled in CLI config
+int anx_cli_is_ssl_enabled(const CliConfigHandle *handle);
+
+/// Get SSL certificate file from CLI config
+char* anx_cli_get_ssl_cert_file(const CliConfigHandle *handle);
+
+/// Get SSL key file from CLI config
+char* anx_cli_get_ssl_key_file(const CliConfigHandle *handle);
+
+/// Get log level from CLI config
+char* anx_cli_get_log_level(const CliConfigHandle *handle);
+
+/// Get log file from CLI config
+char* anx_cli_get_log_file(const CliConfigHandle *handle);
+
+/// Check if cache is enabled in CLI config
+int anx_cli_is_cache_enabled(const CliConfigHandle *handle);
+
+/// Get cache size from CLI config
+size_t anx_cli_get_cache_size(const CliConfigHandle *handle);
+
+/// Get cache TTL from CLI config
+unsigned long anx_cli_get_cache_ttl(const CliConfigHandle *handle);
+
+/// Get threads count from CLI config
+size_t anx_cli_get_threads(const CliConfigHandle *handle);
+
+/// Get max connections from CLI config
+size_t anx_cli_get_max_connections(const CliConfigHandle *handle);
+
+/// Check if daemon mode is enabled in CLI config
+int anx_cli_is_daemon(const CliConfigHandle *handle);
+
+/// Get PID file from CLI config
+char* anx_cli_get_pid_file(const CliConfigHandle *handle);
+
+/// Free CLI config handle
+void anx_cli_config_free(CliConfigHandle *handle);
+
+/// Free CLI parser
+void anx_cli_parser_free(CliParser *parser);
 
 // =============================================================================
 // Library Initialization

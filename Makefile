@@ -60,7 +60,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 # Build and test commands
 
 # Automated testing target
-test: $(TARGET) test-rust test-ffi
+test: $(TARGET) test-rust test-ffi test-integration
 	@echo "Running basic tests..."
 	@./$(TARGET) --version 2>/dev/null || echo "Version test passed"
 	@echo "All tests passed!"
@@ -73,13 +73,16 @@ test-rust:
 # Test FFI integration
 test-ffi: $(RUST_LIB)
 	@echo "Testing FFI integration..."
-	@echo '#include <stdio.h>' > test_ffi.c
-	@echo '#include <stdlib.h>' >> test_ffi.c
-	@echo '#include "src/include/anx_rust.h"' >> test_ffi.c
-	@echo 'int main() { printf("Testing FFI...\\n"); if (anx_rust_init() == 0) { printf("FFI test passed!\\n"); anx_rust_cleanup(); return 0; } return 1; }' >> test_ffi.c
-	@gcc -o test_ffi test_ffi.c -L$(RUST_TARGET_DIR) -l:libanx_core.a -lpthread -ldl -lm
+	@gcc $(CFLAGS) $(INCLUDES) -o test_ffi test_ffi.c -L$(RUST_TARGET_DIR) -l:libanx_core.a -lpthread -ldl -lm
 	@./test_ffi
-	@rm -f test_ffi test_ffi.c
+	@rm -f test_ffi
+
+# Test integration (comprehensive)
+test-integration: $(RUST_LIB)
+	@echo "Testing comprehensive integration..."
+	@gcc $(CFLAGS) $(INCLUDES) -o integration_test integration_test.c -L$(RUST_TARGET_DIR) -l:libanx_core.a -lpthread -ldl -lm
+	@./integration_test
+	@rm -f integration_test
 
 # Target for cleaning up the project
 clean:

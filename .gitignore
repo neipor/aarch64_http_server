@@ -147,5 +147,10 @@ test_ffi.c
 *.log
 *.result
 
+# 推广和营销文件
+PROMOTION_TODO.md
+marketing/
+promotion/
+
 # Added by cargo
 /target

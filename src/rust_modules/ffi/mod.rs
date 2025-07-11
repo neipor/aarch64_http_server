@@ -5,11 +5,12 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_uint, c_ulong};
 use std::ptr;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
-use super::config::{AnxConfig, ConfigError};
-use super::http_parser::{HttpRequest, HttpResponse, HttpParseError, HttpMethod};
-use super::cache::{Cache, CacheConfig, CacheResponse, CacheError, CacheStrategy};
+use super::config::AnxConfig;
+use super::http_parser::{HttpRequest, HttpResponse};
+use super::cache::{Cache, CacheConfig, CacheStrategy};
+use super::cli::{CliConfig, CliParser};
 
 /// C-compatible configuration handle
 pub struct ConfigHandle {
@@ -29,6 +30,11 @@ pub struct HttpResponseHandle {
 /// C-compatible cache handle
 pub struct CacheHandle {
     cache: Box<Cache>,
+}
+
+/// C-compatible CLI configuration handle
+pub struct CliConfigHandle {
+    config: Box<CliConfig>,
 }
 
 /// C-compatible cache response
@@ -200,7 +206,7 @@ pub extern "C" fn anx_config_get_location_path(handle: *const ConfigHandle, inde
 pub extern "C" fn anx_config_free(handle: *mut ConfigHandle) {
     if !handle.is_null() {
         unsafe {
-            Box::from_raw(handle);
+            let _ = Box::from_raw(handle);
         }
     }
 }
@@ -351,7 +357,7 @@ pub extern "C" fn anx_http_is_keep_alive(handle: *const HttpRequestHandle) -> c_
 pub extern "C" fn anx_http_request_free(handle: *mut HttpRequestHandle) {
     if !handle.is_null() {
         unsafe {
-            Box::from_raw(handle);
+            let _ = Box::from_raw(handle);
         }
     }
 }
@@ -438,7 +444,7 @@ pub extern "C" fn anx_http_response_to_bytes(handle: *const HttpResponseHandle, 
 pub extern "C" fn anx_http_response_free(handle: *mut HttpResponseHandle) {
     if !handle.is_null() {
         unsafe {
-            Box::from_raw(handle);
+            let _ = Box::from_raw(handle);
         }
     }
 }
@@ -805,7 +811,7 @@ pub extern "C" fn anx_cache_generate_etag(data: *const u8, len: usize, last_modi
 pub extern "C" fn anx_cache_free(handle: *mut CacheHandle) {
     if !handle.is_null() {
         unsafe {
-            Box::from_raw(handle);
+            let _ = Box::from_raw(handle);
         }
     }
 }
@@ -819,12 +825,12 @@ pub extern "C" fn anx_cache_response_free(response: *mut CacheResponseC) {
             if !resp.data.is_null() {
                 Vec::from_raw_parts(resp.data, resp.data_len, resp.data_len);
             }
-            if !resp.content_type.is_null() {
-                CString::from_raw(resp.content_type);
-            }
-            if !resp.etag.is_null() {
-                CString::from_raw(resp.etag);
-            }
+                    if !resp.content_type.is_null() {
+            let _ = CString::from_raw(resp.content_type);
+        }
+        if !resp.etag.is_null() {
+            let _ = CString::from_raw(resp.etag);
+        }
         }
     }
 }
@@ -834,7 +840,7 @@ pub extern "C" fn anx_cache_response_free(response: *mut CacheResponseC) {
 pub extern "C" fn anx_cache_stats_free(stats: *mut CacheStatsC) {
     if !stats.is_null() {
         unsafe {
-            Box::from_raw(stats);
+            let _ = Box::from_raw(stats);
         }
     }
 }
@@ -848,7 +854,7 @@ pub extern "C" fn anx_cache_stats_free(stats: *mut CacheStatsC) {
 pub extern "C" fn anx_free_string(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
-            CString::from_raw(ptr);
+            let _ = CString::from_raw(ptr);
         }
     }
 }
@@ -859,6 +865,321 @@ pub extern "C" fn anx_free_bytes(ptr: *mut u8, len: usize) {
     if !ptr.is_null() && len > 0 {
         unsafe {
             Vec::from_raw_parts(ptr, len, len);
+        }
+    }
+}
+
+// =============================================================================
+// CLI Functions
+// =============================================================================
+
+/// Create CLI parser
+#[no_mangle]
+pub extern "C" fn anx_cli_parser_create() -> *mut CliParser {
+    let parser = CliParser::new();
+    Box::into_raw(Box::new(parser))
+}
+
+/// Parse command line arguments
+#[no_mangle]
+pub extern "C" fn anx_cli_parse_args(parser: *mut CliParser) -> *mut CliConfigHandle {
+    if parser.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let parser = unsafe { &mut *parser };
+    match parser.parse() {
+        Ok(config) => {
+            let handle = Box::new(CliConfigHandle {
+                config: Box::new(config),
+            });
+            Box::into_raw(handle)
+        }
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Get port from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_port(handle: *const CliConfigHandle) -> u16 {
+    if handle.is_null() {
+        return 8080;
+    }
+    
+    let handle = unsafe { &*handle };
+    handle.config.port
+}
+
+/// Get host from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_host(handle: *const CliConfigHandle) -> *mut c_char {
+    if handle.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let handle = unsafe { &*handle };
+    match CString::new(handle.config.host.clone()) {
+        Ok(s) => s.into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Get static directory from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_static_dir(handle: *const CliConfigHandle) -> *mut c_char {
+    if handle.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let handle = unsafe { &*handle };
+    match &handle.config.static_dir {
+        Some(path) => {
+            match CString::new(path.to_string_lossy().to_string()) {
+                Ok(s) => s.into_raw(),
+                Err(_) => ptr::null_mut(),
+            }
+        }
+        None => ptr::null_mut(),
+    }
+}
+
+/// Get proxy count from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_proxy_count(handle: *const CliConfigHandle) -> usize {
+    if handle.is_null() {
+        return 0;
+    }
+    
+    let handle = unsafe { &*handle };
+    handle.config.proxy_configs.len()
+}
+
+/// Get proxy URL from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_proxy_url(handle: *const CliConfigHandle, index: usize) -> *mut c_char {
+    if handle.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let handle = unsafe { &*handle };
+    if index >= handle.config.proxy_configs.len() {
+        return ptr::null_mut();
+    }
+    
+    let proxy = &handle.config.proxy_configs[index];
+    match CString::new(proxy.target_url.clone()) {
+        Ok(s) => s.into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Get proxy path prefix from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_proxy_path_prefix(handle: *const CliConfigHandle, index: usize) -> *mut c_char {
+    if handle.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let handle = unsafe { &*handle };
+    if index >= handle.config.proxy_configs.len() {
+        return ptr::null_mut();
+    }
+    
+    let proxy = &handle.config.proxy_configs[index];
+    match &proxy.path_prefix {
+        Some(prefix) => {
+            match CString::new(prefix.clone()) {
+                Ok(s) => s.into_raw(),
+                Err(_) => ptr::null_mut(),
+            }
+        }
+        None => ptr::null_mut(),
+    }
+}
+
+/// Check if SSL is enabled in CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_is_ssl_enabled(handle: *const CliConfigHandle) -> c_int {
+    if handle.is_null() {
+        return 0;
+    }
+    
+    let handle = unsafe { &*handle };
+    if handle.config.ssl.is_some() { 1 } else { 0 }
+}
+
+/// Get SSL certificate file from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_ssl_cert_file(handle: *const CliConfigHandle) -> *mut c_char {
+    if handle.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let handle = unsafe { &*handle };
+    match &handle.config.ssl {
+        Some(ssl) => {
+            match CString::new(ssl.cert_file.to_string_lossy().to_string()) {
+                Ok(s) => s.into_raw(),
+                Err(_) => ptr::null_mut(),
+            }
+        }
+        None => ptr::null_mut(),
+    }
+}
+
+/// Get SSL key file from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_ssl_key_file(handle: *const CliConfigHandle) -> *mut c_char {
+    if handle.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let handle = unsafe { &*handle };
+    match &handle.config.ssl {
+        Some(ssl) => {
+            match CString::new(ssl.key_file.to_string_lossy().to_string()) {
+                Ok(s) => s.into_raw(),
+                Err(_) => ptr::null_mut(),
+            }
+        }
+        None => ptr::null_mut(),
+    }
+}
+
+/// Get log level from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_log_level(handle: *const CliConfigHandle) -> *mut c_char {
+    if handle.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let handle = unsafe { &*handle };
+    match CString::new(handle.config.log_level.clone()) {
+        Ok(s) => s.into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Get log file from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_log_file(handle: *const CliConfigHandle) -> *mut c_char {
+    if handle.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let handle = unsafe { &*handle };
+    match &handle.config.log_file {
+        Some(path) => {
+            match CString::new(path.to_string_lossy().to_string()) {
+                Ok(s) => s.into_raw(),
+                Err(_) => ptr::null_mut(),
+            }
+        }
+        None => ptr::null_mut(),
+    }
+}
+
+/// Check if cache is enabled in CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_is_cache_enabled(handle: *const CliConfigHandle) -> c_int {
+    if handle.is_null() {
+        return 0;
+    }
+    
+    let handle = unsafe { &*handle };
+    if handle.config.cache_enabled { 1 } else { 0 }
+}
+
+/// Get cache size from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_cache_size(handle: *const CliConfigHandle) -> usize {
+    if handle.is_null() {
+        return 0;
+    }
+    
+    let handle = unsafe { &*handle };
+    handle.config.cache_size
+}
+
+/// Get cache TTL from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_cache_ttl(handle: *const CliConfigHandle) -> c_ulong {
+    if handle.is_null() {
+        return 3600;
+    }
+    
+    let handle = unsafe { &*handle };
+    handle.config.cache_ttl
+}
+
+/// Get threads count from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_threads(handle: *const CliConfigHandle) -> usize {
+    if handle.is_null() {
+        return 1;
+    }
+    
+    let handle = unsafe { &*handle };
+    handle.config.threads
+}
+
+/// Get max connections from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_max_connections(handle: *const CliConfigHandle) -> usize {
+    if handle.is_null() {
+        return 1000;
+    }
+    
+    let handle = unsafe { &*handle };
+    handle.config.max_connections
+}
+
+/// Check if daemon mode is enabled in CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_is_daemon(handle: *const CliConfigHandle) -> c_int {
+    if handle.is_null() {
+        return 0;
+    }
+    
+    let handle = unsafe { &*handle };
+    if handle.config.daemon { 1 } else { 0 }
+}
+
+/// Get PID file from CLI config
+#[no_mangle]
+pub extern "C" fn anx_cli_get_pid_file(handle: *const CliConfigHandle) -> *mut c_char {
+    if handle.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let handle = unsafe { &*handle };
+    match &handle.config.pid_file {
+        Some(path) => {
+            match CString::new(path.to_string_lossy().to_string()) {
+                Ok(s) => s.into_raw(),
+                Err(_) => ptr::null_mut(),
+            }
+        }
+        None => ptr::null_mut(),
+    }
+}
+
+/// Free CLI config handle
+#[no_mangle]
+pub extern "C" fn anx_cli_config_free(handle: *mut CliConfigHandle) {
+    if !handle.is_null() {
+        unsafe {
+            let _ = Box::from_raw(handle);
+        }
+    }
+}
+
+/// Free CLI parser
+#[no_mangle]
+pub extern "C" fn anx_cli_parser_free(parser: *mut CliParser) {
+    if !parser.is_null() {
+        unsafe {
+            let _ = Box::from_raw(parser);
         }
     }
 } 

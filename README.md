@@ -21,6 +21,15 @@
   - **Nginx兼容性**：支持读取和转换Nginx配置文件
   - **FFI集成**：通过外部函数接口实现C和Rust的无缝集成
   - **内存安全**：Rust模块提供内存安全保证
+  - **命令行参数系统**：支持直接通过命令行启动，比nginx配置更易用
+
+- **🚀 一键启动体验** (v1.1.0+):
+  - **直接指定静态文件目录**：`./anx --static-dir /path/to/files`
+  - **反向代理配置**：`./anx --proxy /api http://backend:8080`
+  - **端口和主机绑定**：`./anx --port 8080 --host 0.0.0.0`
+  - **SSL证书配置**：`./anx --ssl-cert cert.pem --ssl-key key.pem`
+  - **缓存配置**：`./anx --cache-size 100MB --cache-ttl 3600`
+  - **日志级别设置**：`./anx --log-level info --log-file access.log`
 
 - **高性能网络模型**: 
   - 基于`epoll`的**非阻塞I/O**，支持海量并发连接。
@@ -79,6 +88,15 @@
 
 3.  **运行**:
     ```bash
+    # 🚀 一键启动 (推荐)
+    ./anx --static-dir /var/www/html --port 8080
+    
+    # 反向代理示例
+    ./anx --static-dir /var/www/html --proxy /api http://backend:8080 --port 80
+    
+    # SSL 配置示例
+    ./anx --static-dir /var/www/html --ssl-cert cert.pem --ssl-key key.pem --port 443
+    
     # 使用 TOML 配置文件
     ./anx -c configs/anx.toml
     
@@ -87,7 +105,8 @@
     ```
 
 4.  **配置文件**:
-    - **TOML格式** (推荐): 参见 `configs/anx.toml`
+    - **命令行参数** (推荐): 无需配置文件，直接通过命令行参数启动
+    - **TOML格式**: 参见 `configs/anx.toml`
     - **Nginx格式**: 参见 `configs/nginx.conf.example`
     - **配置文档**: 详见 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
 

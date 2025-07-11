@@ -9,9 +9,10 @@ use std::os::raw::c_char;
 // Module declarations
 pub mod rust_modules {
     pub mod config;
-    pub mod http_parser;
-    pub mod cache;
-    pub mod ffi;
+pub mod http_parser;
+pub mod cache;
+pub mod cli;
+pub mod ffi;
 }
 
 // Re-export for convenience
