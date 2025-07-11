@@ -106,8 +106,9 @@ start_server() {
     
     case $server_name in
         "anx")
-            ./anx --static-dir ./test_web_root --port $port --daemon --pid-file /tmp/anx.pid
-            sleep 2
+            # 确保ANX在后台运行
+            ./anx --static-dir ./test_web_root --port $port --daemon --pid-file /tmp/anx.pid &
+            sleep 3
             ;;
         "nginx")
             # 创建临时配置
@@ -123,18 +124,25 @@ http {
     }
 }
 EOF
-            sudo nginx -c $(pwd)/nginx_temp.conf
-            sleep 2
+            # 确保nginx在后台运行
+            sudo nginx -c $(pwd)/nginx_temp.conf &
+            sleep 3
             ;;
     esac
     
     # 检查服务器是否启动
-    if curl -s "http://localhost:$port/test.html" &> /dev/null; then
-        log_success "$server_name 启动成功"
-    else
-        log_error "$server_name 启动失败"
-        return 1
-    fi
+    local retries=0
+    while [ $retries -lt 10 ]; do
+        if curl -s "http://localhost:$port/test.html" &> /dev/null; then
+            log_success "$server_name 启动成功"
+            return 0
+        fi
+        sleep 1
+        retries=$((retries + 1))
+    done
+    
+    log_error "$server_name 启动失败"
+    return 1
 }
 
 # 停止服务器
@@ -148,15 +156,34 @@ stop_server() {
             if [ -f "/tmp/anx.pid" ]; then
                 kill $(cat /tmp/anx.pid) 2>/dev/null || true
                 rm -f /tmp/anx.pid
+            else
+                # 如果没有pid文件，通过端口查找进程
+                pkill -f "anx.*--port" 2>/dev/null || true
             fi
             ;;
         "nginx")
             sudo nginx -s stop 2>/dev/null || true
+            # 确保nginx进程完全停止
+            sudo pkill -f nginx 2>/dev/null || true
             rm -f nginx_temp.conf
             ;;
     esac
     
-    sleep 2
+    # 等待进程完全停止
+    sleep 3
+    
+    # 检查端口是否释放
+    local port=$2
+    if [ -n "$port" ]; then
+        local retries=0
+        while [ $retries -lt 10 ]; do
+            if ! curl -s "http://localhost:$port/test.html" &> /dev/null; then
+                break
+            fi
+            sleep 1
+            retries=$((retries + 1))
+        done
+    fi
 }
 
 # 运行性能测试
@@ -208,8 +235,8 @@ generate_report() {
 # 清理
 cleanup() {
     log_info "清理环境..."
-    stop_server "anx"
-    stop_server "nginx"
+    stop_server "anx" 40080
+    stop_server "nginx" 40081
     rm -f /tmp/anx.pid nginx_temp.conf
     log_success "清理完成"
 }
@@ -230,7 +257,7 @@ main() {
     # 测试 ANX
     if start_server "anx" 40080; then
         run_benchmark "anx" 40080
-        stop_server "anx"
+        stop_server "anx" 40080
     fi
     
     sleep 3
@@ -238,7 +265,7 @@ main() {
     # 测试 Nginx
     if start_server "nginx" 40081; then
         run_benchmark "nginx" 40081
-        stop_server "nginx"
+        stop_server "nginx" 40081
     fi
     
     # 生成报告
