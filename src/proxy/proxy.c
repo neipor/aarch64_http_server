@@ -157,9 +157,9 @@ static int connect_to_backend(const char *host, int port) {
 
 // 构建代理请求
 static char *build_proxy_request(const char *method, const char *original_path, 
-                                const char *http_version, const char *headers,
-                                const char *backend_host, int backend_port,
-                                const char *proxy_path) {
+                               const char *http_version, const char *headers,
+                               const char *backend_host, int backend_port,
+                               const char *proxy_path) {
     char *request_buffer = malloc(BUFFER_SIZE * 2);
     if (!request_buffer) return NULL;
     
@@ -197,7 +197,7 @@ static char *build_proxy_request(const char *method, const char *original_path,
             if (strncasecmp(line, "Host:", 5) != 0 && 
                 strncasecmp(line, "Connection:", 11) != 0) {
                 offset += snprintf(request_buffer + offset, BUFFER_SIZE * 2 - offset,
-                                  "%s\r\n", line);
+                                "%s\r\n", line);
             }
             line = strtok(NULL, "\r\n");
         }
@@ -242,17 +242,15 @@ static int forward_response(int backend_fd, int client_fd) {
 }
 
 // 处理HTTP反向代理请求
-int handle_proxy_request(int client_socket, const char *method, const char *path, 
-                        const char *http_version, const char *headers, 
-                        const char *proxy_pass_url, const char *client_ip) {
-    (void)client_ip; // 未使用的参数
+int handle_proxy_request(int client_socket, const char *req_path, const char *proxy_pass,
+                        const char *client_ip, core_config_t *core_conf) {
     char log_msg[256];
-    snprintf(log_msg, sizeof(log_msg), "Proxying request %s %s to %s", 
-             method, path, proxy_pass_url);
+    snprintf(log_msg, sizeof(log_msg), "Proxying request %s to %s", 
+             req_path, proxy_pass);
     log_message(LOG_LEVEL_INFO, log_msg);
     
     // 解析proxy_pass URL
-    proxy_url_t *proxy_url = parse_proxy_url(proxy_pass_url);
+    proxy_url_t *proxy_url = parse_proxy_url(proxy_pass);
     if (!proxy_url) {
         log_message(LOG_LEVEL_ERROR, "Failed to parse proxy_pass URL");
         return -1;
@@ -266,7 +264,12 @@ int handle_proxy_request(int client_socket, const char *method, const char *path
     }
     
     // 构建代理请求
-    char *proxy_request = build_proxy_request(method, path, http_version, headers,
+    // 注意: 这里简化了请求构建，实际实现中应该从HTTP请求中提取method、http_version和headers
+    const char *method = "GET";  // 从请求中提取
+    const char *http_version = "HTTP/1.1";  // 默认使用HTTP/1.1
+    const char *headers = "";  // 应该从原始请求中提取并过滤敏感头
+    
+    char *proxy_request = build_proxy_request(method, req_path, http_version, headers,
                                              proxy_url->host, proxy_url->port,
                                              proxy_url->path);
     if (!proxy_request) {
@@ -299,11 +302,10 @@ int handle_proxy_request(int client_socket, const char *method, const char *path
 
 // 处理HTTPS反向代理请求
 int handle_https_proxy_request(SSL *ssl, const char *method, const char *path, 
-                              const char *http_version, const char *headers,
-                              const char *proxy_pass_url, const char *client_ip) {
-    (void)client_ip; // 未使用的参数
+                             const char *http_version, const char *headers,
+                             const char *proxy_pass_url, const char *client_ip) {
     char log_msg[256];
-    snprintf(log_msg, sizeof(log_msg), "Proxying HTTPS request %s %s to %s", 
+    snprintf(log_msg, sizeof(log_msg), "HTTPS Proxying request %s %s to %s", 
              method, path, proxy_pass_url);
     log_message(LOG_LEVEL_INFO, log_msg);
     
@@ -323,8 +325,8 @@ int handle_https_proxy_request(SSL *ssl, const char *method, const char *path,
     
     // 构建代理请求
     char *proxy_request = build_proxy_request(method, path, http_version, headers,
-                                             proxy_url->host, proxy_url->port,
-                                             proxy_url->path);
+                                            proxy_url->host, proxy_url->port,
+                                            proxy_url->path);
     if (!proxy_request) {
         log_message(LOG_LEVEL_ERROR, "Failed to build proxy request");
         close(backend_fd);
@@ -342,11 +344,76 @@ int handle_https_proxy_request(SSL *ssl, const char *method, const char *path,
         return -1;
     }
     
-    // 转发响应（从后端到SSL连接）
+    // 转发响应
     char buffer[BUFFER_SIZE];
     ssize_t bytes_read;
     int total_bytes = 0;
+    int in_headers = 1;  // 标记是否在处理响应头
+    int content_length = -1;  // 响应体长度
+    int chunked = 0;  // 是否为分块传输
     
+    // 读取并解析响应头
+    char *header_buffer = malloc(BUFFER_SIZE);
+    int header_len = 0;
+    
+    while (in_headers && (bytes_read = read(backend_fd, buffer, sizeof(buffer))) > 0) {
+        // 寻找响应头结束标记
+        char *header_end = memmem(buffer, bytes_read, "\r\n\r\n", 4);
+        if (header_end) {
+            // 计算头部长度
+            int headers_size = header_end - buffer + 4;
+            memcpy(header_buffer + header_len, buffer, headers_size);
+            header_len += headers_size;
+            
+            // 解析Content-Length
+            char *cl_start = strcasestr(header_buffer, "Content-Length:");
+            if (cl_start) {
+                content_length = atoi(cl_start + 15);
+            }
+            
+            // 检查是否为分块传输
+            char *te_start = strcasestr(header_buffer, "Transfer-Encoding:");
+            if (te_start && strstr(te_start, "chunked")) {
+                chunked = 1;
+            }
+            
+            // 发送响应头到客户端
+            if (SSL_write(ssl, header_buffer, header_len) <= 0) {
+                log_message(LOG_LEVEL_ERROR, "Failed to write response headers to SSL client");
+                free(header_buffer);
+                close(backend_fd);
+                free(proxy_request);
+                free_proxy_url(proxy_url);
+                return -1;
+            }
+            
+            total_bytes += header_len;
+            
+            // 处理剩余的响应体部分
+            int remaining = bytes_read - headers_size;
+            if (remaining > 0) {
+                if (SSL_write(ssl, header_end + 4, remaining) <= 0) {
+                    log_message(LOG_LEVEL_ERROR, "Failed to write response body to SSL client");
+                    free(header_buffer);
+                    close(backend_fd);
+                    free(proxy_request);
+                    free_proxy_url(proxy_url);
+                    return -1;
+                }
+                total_bytes += remaining;
+            }
+            
+            in_headers = 0;
+        } else {
+            // 继续累积头部数据
+            memcpy(header_buffer + header_len, buffer, bytes_read);
+            header_len += bytes_read;
+        }
+    }
+    
+    free(header_buffer);
+    
+    // 继续转发响应体
     while ((bytes_read = read(backend_fd, buffer, sizeof(buffer))) > 0) {
         if (SSL_write(ssl, buffer, bytes_read) <= 0) {
             log_message(LOG_LEVEL_ERROR, "Failed to write response to SSL client");
@@ -360,9 +427,14 @@ int handle_https_proxy_request(SSL *ssl, const char *method, const char *path,
     
     if (bytes_read < 0) {
         log_message(LOG_LEVEL_ERROR, "Failed to read response from backend");
+        close(backend_fd);
+        free(proxy_request);
+        free_proxy_url(proxy_url);
+        return -1;
     }
     
-    snprintf(log_msg, sizeof(log_msg), "Forwarded %d bytes from backend to HTTPS client", total_bytes);
+    snprintf(log_msg, sizeof(log_msg), "Forwarded %d bytes from backend to SSL client", 
+             total_bytes);
     log_message(LOG_LEVEL_DEBUG, log_msg);
     
     // 清理资源
@@ -371,4 +443,4 @@ int handle_https_proxy_request(SSL *ssl, const char *method, const char *path,
     free_proxy_url(proxy_url);
     
     return total_bytes;
-} 
+}

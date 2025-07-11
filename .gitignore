@@ -1,156 +1,83 @@
-# Compiled Object files
+# 编译输出
+/target/
+/build/
 *.o
-*.obj
-
-# Compiled Dynamic libraries
 *.so
-*.dylib
-*.dll
-
-# Compiled Static libraries
 *.a
-*.la
-*.lo
-
-# Compiled executables
+*.lib
+*.dll
 *.exe
-*.out
 anx
 
-# Generated files
-build/
-*.core
-*.stackdump
+# 测试文件
+/test_www/
+/static/
+/logs/
+*.log
+test_api_server.py
+test_config.toml
+start_test.sh
 
-# Backup files
-*~
-*.bak
-*.tmp
+# SSL证书
+/certs/
+*.crt
+*.key
+*.pem
+
+# IDE和编辑器
+.vscode/
+.idea/
 *.swp
 *.swo
+*~
 
-# Editor files
-.vscode/
+# 操作系统
 .DS_Store
-.idea/
-*.sublime-*
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Coverage files
-*.gcno
-*.gcda
-*.gcov
-coverage/
-
-# Memory debugging files
-valgrind-out.txt
-*.memcheck
-
-# Performance profiling
-gmon.out
-perf.data*
-callgrind.out.*
-
-# SSL/TLS certificates and keys (for security)
-*.key
-*.crt
-*.pem
-*.p12
-*.pfx
-ssl/
-
-# Development database files
-*.db
-*.sqlite
-*.sqlite3
-
-# Container files
-docker-compose.override.yml
-
-# Local environment files
-.env
-.env.local
-.env.*.local
-
-# Cache files
-.cache/
-*.cache
-
-# Dependency tracking
-.deps/
-
-# Build artifacts
-*.map
-*.lst
-
-# Man pages
-*.1
-*.3
-*.7
-
-# Autotools
-autom4te.cache/
-config.guess
-config.log
-config.status
-config.sub
-configure
-install-sh
-ltmain.sh
-missing
-depcomp
-compile
-Makefile.in
-aclocal.m4
-
-# IDE specific files
-tags
-.tags
-TAGS
-.ctags
-.ccls-cache/
-.clangd/
-cscope.*
-
-# Operating system files
 Thumbs.db
-ehthumbs.db
-Desktop.ini
-.Spotlight-V100
-.Trashes
 
-# Temporary build files
-*.i
-*.ii
-*.s
+# 缓存和临时文件
+*.cache
+*.tmp
+/tmp/
 
-# Additional SSL certificate locations
-configs/ssl/*.key
-configs/ssl/*.crt
-configs/ssl/*.pem
+# 依赖管理
+/node_modules/
+/vendor/
+/.cargo/
+Cargo.lock
 
-# Keep example configs but ignore actual configs
-!*.conf.example
-!configs/*.example
+# 测试覆盖率报告
+/coverage/
+*.gcda
+*.gcno
+*.gcov
 
-# 测试文件和结果
-test_data/
-nginx_config/
-performance_benchmark.sh
-test_ffi
-test_ffi.c
-*.log
-*.result
+# 基准测试结果
+/benchmark_results/
+/benchmark_logs/
+*.bench
 
-# 推广和营销文件
-PROMOTION_TODO.md
-marketing/
-promotion/
+# 文档生成
+/docs/_build/
+/target/doc/
 
-# Added by cargo
-/target
+# 其他
+*.bak
+*.old
+*.orig
+.env
+.env.*
+
+# 基准测试
+/benchmark_results/
+benchmark.sh
+analyze_results.py
+*.txt
+*.png
+*.md
+!README.md
+
+# Docker
+docker-compose.yml
+Dockerfile.*
+.docker/

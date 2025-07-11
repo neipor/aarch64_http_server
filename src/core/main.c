@@ -13,6 +13,9 @@
 #include <sys/types.h>
 #include <dlfcn.h>
 #include "../include/anx_rust.h"
+#include "../utils/asm/asm_opt.h"
+#include "../http/http.h"
+#include "../http/http_module.h"
 
 #include "config.h"
 #include "core.h"
@@ -48,6 +51,47 @@ void signal_handler(int signum) {
         kill(worker_pids[i], SIGKILL);
     }
     // Let the main loop's wait() handle reaping
+}
+
+void cleanup_resources(core_config_t *core_conf, SSL_CTX *ssl_ctx, pid_t *worker_pids, int num_workers) {
+    // 关闭所有监听socket
+    if (core_conf) {
+        for(int i = 0; i < core_conf->listening_socket_count; i++) {
+            if(core_conf->listening_sockets[i].fd != -1) {
+                close(core_conf->listening_sockets[i].fd);
+            }
+        }
+    }
+
+    // 终止所有工作进程
+    if (worker_pids) {
+        for (int i = 0; i < num_workers; i++) {
+            if (worker_pids[i] > 0) {
+                kill(worker_pids[i], SIGTERM);
+                waitpid(worker_pids[i], NULL, 0);
+            }
+        }
+        free(worker_pids);
+    }
+
+    // 清理SSL上下文
+    if (ssl_ctx) {
+        SSL_CTX_free(ssl_ctx);
+        EVP_cleanup();
+        ERR_free_strings();
+        CRYPTO_cleanup_all_ex_data();
+    }
+
+    // 清理配置
+    if (core_conf) {
+        free_core_config(core_conf);
+    }
+
+    // 清理日志
+    cleanup_logging();
+    
+    // 清理HTTP模块
+    http_module_cleanup();
 }
 
 int main(int argc, char *argv[]) {
@@ -120,7 +164,6 @@ int main(int argc, char *argv[]) {
         size_t cache_size = anx_cli_get_cache_size(cli_conf);
         unsigned long cache_ttl = anx_cli_get_cache_ttl(cli_conf);
         size_t threads = anx_cli_get_threads(cli_conf);
-        size_t max_connections = anx_cli_get_max_connections(cli_conf);
         
         printf("[CLI] 启动参数: --static-dir=%s --port=%u --host=%s\n", 
                static_dir ? static_dir : "", port, host ? host : "");
@@ -140,6 +183,13 @@ int main(int argc, char *argv[]) {
         }
         
         log_message(LOG_LEVEL_INFO, "ANX HTTP Server v1.1.0+ starting up...");
+        
+        // 初始化汇编优化模块
+        asm_opt_init();
+        log_message(LOG_LEVEL_INFO, "Assembly optimizations initialized");
+        
+        // 初始化HTTP模块
+        http_module_init();
         
         // 创建配置结构体
         config_t *config = calloc(1, sizeof(config_t));
@@ -237,6 +287,11 @@ int main(int argc, char *argv[]) {
             }
         }
         
+        // 初始化SSL
+        SSL_library_init();
+        OpenSSL_add_all_algorithms();
+        SSL_load_error_strings();
+        
         // 创建核心配置
         core_config_t *core_conf = create_core_config(config);
         if (!core_conf) {
@@ -247,13 +302,49 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         
-        // 初始化SSL
-        SSL_library_init();
-        OpenSSL_add_all_algorithms();
-        SSL_load_error_strings();
-        SSL_CTX *ssl_ctx = NULL;
+        // 检查端口是否被占用
+        if (is_port_in_use(port)) {
+            char log_msg[256];
+            snprintf(log_msg, sizeof(log_msg), "Port %u is already in use", port);
+            log_message(LOG_LEVEL_ERROR, log_msg);
+            free_core_config(core_conf);
+            free_config(config);
+            anx_cli_config_free(cli_conf);
+            anx_cli_parser_free(parser);
+            return 1;
+        }
         
-        // 检查SSL配置
+        // 如果是dry-run模式，只打印配置
+        if (dry_run) {
+            printf("\033[1;32m[DRY-RUN] Configuration parsed successfully:\033[0m\n");
+            printf("Port: %u\n", port);
+            printf("Static directory: %s\n", static_dir ? static_dir : "not set");
+            printf("Worker processes: %d\n", core_conf->worker_processes);
+            printf("Cache enabled: %s\n", cache_enabled ? "yes" : "no");
+            printf("Assembly optimizations: %s\n", asm_opt_is_supported() ? "enabled" : "disabled");
+            
+            free_core_config(core_conf);
+            free_config(config);
+            anx_cli_config_free(cli_conf);
+            anx_cli_parser_free(parser);
+            return 0;
+        }
+        
+        // 守护进程模式
+        if (is_daemon) {
+            if (daemon(0, 0) < 0) {
+                log_message(LOG_LEVEL_ERROR, "Failed to daemonize");
+                free_core_config(core_conf);
+                free_config(config);
+                anx_cli_config_free(cli_conf);
+                anx_cli_parser_free(parser);
+                return 1;
+            }
+            log_message(LOG_LEVEL_INFO, "Server daemonized");
+        }
+        
+        // SSL配置
+        SSL_CTX *ssl_ctx = NULL;
         int is_ssl_enabled = anx_cli_is_ssl_enabled(cli_conf);
         if (is_ssl_enabled) {
             char* ssl_cert = anx_cli_get_ssl_cert_file(cli_conf);
@@ -333,6 +424,9 @@ int main(int argc, char *argv[]) {
         free_config(config);
         cleanup_logging();
         
+        // 清理HTTP模块
+        http_module_cleanup();
+        
         // 清理CLI资源
         anx_free_string(static_dir);
         anx_free_string(host);
@@ -344,7 +438,9 @@ int main(int argc, char *argv[]) {
         // 启动成功高亮提示
         printf("\033[1;32m[OK] ANX HTTP Server 已启动！\033[0m\n");
         printf("访问入口: \033[1;36mhttp://%s:%u/\033[0m\n", host, port);
-        printf("静态目录: %s\n线程数: %zu\n缓存: %s\n", static_dir, threads, cache_enabled ? "启用" : "关闭");
+        printf("静态目录: %s\n线程数: %zu\n缓存: %s\n汇编优化: %s\n", 
+               static_dir, threads, cache_enabled ? "启用" : "关闭",
+               asm_opt_is_supported() ? "启用" : "禁用");
         fflush(stdout);
         
         return 0;
@@ -483,11 +579,13 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < core_conf->worker_processes; i++) {
         pid_t pid = fork();
         if (pid == -1) {
-            perror("fork failed");
-            cleanup_logging();
+            log_message(LOG_LEVEL_ERROR, "fork failed");
+            cleanup_resources(core_conf, ssl_ctx, worker_pids, num_workers_spawned);
             exit(EXIT_FAILURE);
         } else if (pid == 0) {
-            // Pass only the valid FDs
+            // 工作进程 - 不需要释放worker_pids，因为它是栈分配的
+            
+            // 传递有效的文件描述符
             int worker_http_fd = -1;
             int worker_https_fd = -1;
             for (int j = 0; j < core_conf->listening_socket_count; j++) {
@@ -499,15 +597,21 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
+            
             worker_loop(worker_http_fd, worker_https_fd, core_conf, ssl_ctx);
+            
+            // 工作进程清理
+            cleanup_resources(core_conf, ssl_ctx, NULL, 0);
             exit(0);
         } else {
             worker_pids[i] = pid;
             num_workers_spawned++;
         }
     }
+    
     log_message(LOG_LEVEL_DEBUG, "--> main: All workers forked");
 
+    // 等待所有工作进程退出
     for (int i = 0; i < core_conf->worker_processes; i++) {
         wait(NULL);
     }
@@ -515,17 +619,9 @@ int main(int argc, char *argv[]) {
     log_message(LOG_LEVEL_INFO, "All workers have shut down. Master process exiting.");
     log_message(LOG_LEVEL_DEBUG, "--> main: Cleaning up...");
     
-    for(int i = 0; i < core_conf->listening_socket_count; i++) {
-        if(core_conf->listening_sockets[i].fd != -1)
-            close(core_conf->listening_sockets[i].fd);
-    }
-
-    if (ssl_ctx) SSL_CTX_free(ssl_ctx);
-    free_core_config(core_conf);
-
-    // Cleanup logging at the end
-    cleanup_logging();
-
+    // 主进程清理
+    cleanup_resources(core_conf, ssl_ctx, worker_pids, num_workers_spawned);
+    
     log_message(LOG_LEVEL_DEBUG, "--> main: END");
     return 0;
 }

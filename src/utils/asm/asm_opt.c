@@ -2098,4 +2098,48 @@ void asm_opt_print_statistics(void) {
              freq, l1_size, l2_size, l3_size);
     
     log_message(LOG_LEVEL_INFO, log_msg);
+}
+
+// 优化的strrchr实现（aarch64）
+char* asm_opt_strrchr(const char* s, int c) {
+    #ifdef __aarch64__
+    if (!s) return NULL;
+    
+    const char* last_occurrence = NULL;
+    const char* ptr = s;
+    
+    // 使用64位寄存器快速检查8字节块
+    while (1) {
+        uint64_t chunk;
+        __asm__ volatile (
+            "ldr %0, [%1]\n\t"
+            : "=r"(chunk) : "r"(ptr) : "memory"
+        );
+        
+        // 检查是否有零字节
+        if (((chunk - 0x0101010101010101ULL) & ~chunk & 0x8080808080808080ULL) != 0) {
+            // 找到字符串结束，逐字节检查
+            while (*ptr != '\0') {
+                if (*ptr == c) {
+                    last_occurrence = ptr;
+                }
+                ptr++;
+            }
+            break;
+        }
+        
+        // 在当前块中查找字符c
+        for (int i = 0; i < 8; i++) {
+            if (ptr[i] == c) {
+                last_occurrence = (char*)ptr + i;
+            }
+        }
+        
+        ptr += 8;
+    }
+    
+    return (char*)last_occurrence;
+    #else
+    return strrchr(s, c);
+    #endif
 } 

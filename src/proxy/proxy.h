@@ -4,9 +4,8 @@
 #include "core.h"
 
 // 处理HTTP反向代理请求
-int handle_proxy_request(int client_socket, const char *method, const char *path, 
-                        const char *http_version, const char *headers, 
-                        const char *proxy_pass_url, const char *client_ip);
+int handle_proxy_request(int client_socket, const char *req_path, const char *proxy_pass,
+                        const char *client_ip, core_config_t *core_conf);
 
 // 处理HTTPS反向代理请求
 int handle_https_proxy_request(SSL *ssl, const char *method, const char *path, 

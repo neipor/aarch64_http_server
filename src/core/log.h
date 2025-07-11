@@ -39,6 +39,9 @@ typedef struct {
   int upstream_status;
   char *upstream_addr;
   double upstream_response_time_ms;
+  // 添加缺失的字段
+  char *request_uri;
+  time_t timestamp;
 } access_log_entry_t;
 
 // Log configuration

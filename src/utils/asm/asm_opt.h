@@ -33,6 +33,7 @@ int asm_opt_strcmp(const char* s1, const char* s2);
 int asm_opt_strncmp(const char* s1, const char* s2, size_t n);
 char* asm_opt_strstr(const char* haystack, const char* needle);
 char* asm_opt_strchr(const char* s, int c);
+char* asm_opt_strrchr(const char* s, int c);  // 添加strrchr函数声明
 
 // 哈希函数优化
 uint32_t asm_opt_hash_string(const char* str);

@@ -22,6 +22,7 @@ typedef struct location_block {
   char *path;
   directive_t *directives;
   int directive_count;
+  char *proxy_pass;  // 添加proxy_pass字段
   struct location_block *next;
 } location_block_t;
 

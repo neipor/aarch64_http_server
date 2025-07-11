@@ -241,6 +241,132 @@ cleanup() {
     log_success "清理完成"
 }
 
+# 安装 Apache
+install_apache() {
+    log_info "安装 Apache..."
+    if command -v apache2 &> /dev/null; then
+        log_success "Apache 已安装"
+        return
+    fi
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get install -y apache2
+    else
+        log_error "请手动安装 Apache (apache2)"
+        exit 1
+    fi
+    log_success "Apache 安装完成"
+}
+
+# 启动 Apache
+start_apache() {
+    local port=$1
+    log_info "启动 Apache (端口: $port)..."
+    sudo systemctl stop apache2 2>/dev/null || true
+    sudo cp /etc/apache2/ports.conf /etc/apache2/ports.conf.bak_quickbench 2>/dev/null || true
+    echo "Listen $port" | sudo tee /etc/apache2/ports.conf > /dev/null
+    sudo cp /etc/apache2/sites-available/000-default.conf /etc/apache2/000-default.conf.bak_quickbench 2>/dev/null || true
+    sudo sed -i "s|DocumentRoot .*|DocumentRoot $(pwd)/test_web_root|g" /etc/apache2/sites-available/000-default.conf
+    sudo systemctl start apache2
+    sleep 3
+    # 检查
+    local retries=0
+    while [ $retries -lt 10 ]; do
+        if curl -s "http://localhost:$port/test.html" &> /dev/null; then
+            log_success "Apache 启动成功"
+            return 0
+        fi
+        sleep 1
+        retries=$((retries + 1))
+    done
+    log_error "Apache 启动失败"
+    return 1
+}
+
+# 停止 Apache
+stop_apache() {
+    local port=$1
+    log_info "停止 Apache..."
+    sudo systemctl stop apache2 2>/dev/null || true
+    # 恢复配置
+    if [ -f /etc/apache2/ports.conf.bak_quickbench ]; then
+        sudo mv /etc/apache2/ports.conf.bak_quickbench /etc/apache2/ports.conf
+    fi
+    if [ -f /etc/apache2/000-default.conf.bak_quickbench ]; then
+        sudo mv /etc/apache2/000-default.conf.bak_quickbench /etc/apache2/sites-available/000-default.conf
+    fi
+    sleep 3
+    # 检查端口是否释放
+    local retries=0
+    while [ $retries -lt 10 ]; do
+        if ! curl -s "http://localhost:$port/test.html" &> /dev/null; then
+            break
+        fi
+        sleep 1
+        retries=$((retries + 1))
+    done
+}
+
+# 安装 Tomcat
+install_tomcat() {
+    log_info "安装 Tomcat..."
+    if [ -d "/opt/tomcat" ]; then
+        log_success "Tomcat 已安装"
+        return
+    fi
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get install -y wget default-jdk
+        sudo useradd -m -U -d /opt/tomcat -s /bin/false tomcat || true
+        wget -qO- https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.85/bin/apache-tomcat-9.0.85.tar.gz | sudo tar xz -C /opt/tomcat --strip-components=1
+        sudo chown -R tomcat: /opt/tomcat
+        sudo chmod +x /opt/tomcat/bin/*.sh
+    else
+        log_error "请手动安装 Tomcat (并解压到/opt/tomcat)"
+        exit 1
+    fi
+    log_success "Tomcat 安装完成"
+}
+
+# 启动 Tomcat
+start_tomcat() {
+    local port=$1
+    log_info "启动 Tomcat (端口: $port)..."
+    # 修改server.xml端口
+    sudo sed -i "s/port=\"8080\"/port=\"$port\"/g" /opt/tomcat/conf/server.xml
+    sudo -u tomcat /opt/tomcat/bin/startup.sh
+    sleep 8
+    # 拷贝测试文件到ROOT
+    sudo cp test_web_root/test.html /opt/tomcat/webapps/ROOT/test.html
+    # 检查
+    local retries=0
+    while [ $retries -lt 10 ]; do
+        if curl -s "http://localhost:$port/test.html" &> /dev/null; then
+            log_success "Tomcat 启动成功"
+            return 0
+        fi
+        sleep 1
+        retries=$((retries + 1))
+    done
+    log_error "Tomcat 启动失败"
+    return 1
+}
+
+# 停止 Tomcat
+stop_tomcat() {
+    local port=$1
+    log_info "停止 Tomcat..."
+    sudo -u tomcat /opt/tomcat/bin/shutdown.sh 2>/dev/null || true
+    sleep 5
+    # 检查端口是否释放
+    local retries=0
+    while [ $retries -lt 10 ]; do
+        if ! curl -s "http://localhost:$port/test.html" &> /dev/null; then
+            break
+        fi
+        sleep 1
+        retries=$((retries + 1))
+    done
+}
+
 # 主函数
 main() {
     log_info "开始快速性能测试..."
@@ -250,6 +376,8 @@ main() {
     create_test_files
     build_anx
     install_nginx
+    install_apache
+    install_tomcat
     
     # 清空结果文件
     > benchmark_results.csv
@@ -266,6 +394,22 @@ main() {
     if start_server "nginx" 40081; then
         run_benchmark "nginx" 40081
         stop_server "nginx" 40081
+    fi
+    
+    sleep 3
+    
+    # 测试 Apache
+    if start_apache 40082; then
+        run_benchmark "apache" 40082
+        stop_apache 40082
+    fi
+    
+    sleep 3
+    
+    # 测试 Tomcat
+    if start_tomcat 40083; then
+        run_benchmark "tomcat" 40083
+        stop_tomcat 40083
     fi
     
     # 生成报告
