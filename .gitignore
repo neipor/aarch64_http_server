@@ -46,21 +46,6 @@ Thumbs.db
 /.cargo/
 Cargo.lock
 
-# 测试覆盖率报告
-/coverage/
-*.gcda
-*.gcno
-*.gcov
-
-# 基准测试结果
-/benchmark_results/
-/benchmark_logs/
-*.bench
-
-# 文档生成
-/docs/_build/
-/target/doc/
-
 # 其他
 *.bak
 *.old
@@ -68,16 +53,3 @@ Cargo.lock
 .env
 .env.*
 
-# 基准测试
-/benchmark_results/
-benchmark.sh
-analyze_results.py
-*.txt
-*.png
-*.md
-!README.md
-
-# Docker
-docker-compose.yml
-Dockerfile.*
-.docker/
